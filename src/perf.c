@@ -17,8 +17,8 @@ static SceUInt32 g_perf_tick_last = 0; // AVG CPU load
 static SceUInt32 g_perf_tick_q_last = 0; // Peak CPU load
 static SceUInt32 g_perf_tick_fps_last = 0; // Framerate
 
-static SceUInt32 g_perf_idle_clock_last[4] = {0, 0, 0, 0};
-static SceUInt32 g_perf_idle_clock_q_last[4] = {0, 0, 0, 0};
+static SceKernelSysClock g_perf_idle_clock_last[4] = {0, 0, 0, 0};
+static SceKernelSysClock g_perf_idle_clock_q_last[4] = {0, 0, 0, 0};
 
 static psvs_memory_t g_perf_memusage = {0};
 static int g_perf_temp = 0;
