@@ -73,17 +73,19 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
     psvs_perf_calc_fps();
     psvs_gui_set_framebuf(pParam);
 
-    if (psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
+    psvs_gui_mode_t mode = psvs_gui_get_mode();
+
+    if (mode == PSVS_GUI_MODE_FULL) {
         ksceKernelGetProcessTitleId(ksceKernelGetProcessId(), g_titleid, sizeof(g_titleid));
         psvs_perf_poll_memory();
     }
 
-    if (psvs_gui_get_mode() == PSVS_GUI_MODE_FPS) {
-        // draw onto fb
-        psvs_gui_dd_fps();
-    } else {
-        // cpy from buffer
-        psvs_gui_cpy();
+    if (mode == PSVS_GUI_MODE_FPS || mode == PSVS_GUI_MODE_FULL) {
+        psvs_gui_dd_fps(); // draw fps onto fb
+    }
+
+    if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
+        psvs_gui_cpy(); // cpy from buffer
     }
 
 DISPLAY_HOOK_RET:
@@ -136,28 +138,31 @@ int kscePowerSetGpuXbarClockFrequency_patched(int freq) {
 
 static int psvs_thread(SceSize args, void *argp) {
     while (g_thread_run) {
+        bool fb_or_mode_changed = psvs_gui_mode_changed() || psvs_gui_fb_res_changed();
+        psvs_gui_mode_t mode = psvs_gui_get_mode();
+
         // If in OSD/FULL mode, poll shown info
-        if (psvs_gui_get_mode() >= PSVS_GUI_MODE_OSD) {
+        if (mode >= PSVS_GUI_MODE_OSD) {
             psvs_perf_poll_cpu();
         }
 
         // Redraw buffer template on gui mode or fb change
-        if (psvs_gui_mode_changed() || psvs_gui_fb_res_changed()) {
-            if (psvs_gui_get_mode() == PSVS_GUI_MODE_OSD) {
+        if (fb_or_mode_changed) {
+            if (mode == PSVS_GUI_MODE_OSD) {
                 psvs_gui_draw_osd_template();
-            } else if (psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
+            } else if (mode == PSVS_GUI_MODE_FULL) {
                 psvs_gui_draw_template();
             }
         }
 
         // Draw OSD mode
-        if (psvs_gui_get_mode() == PSVS_GUI_MODE_OSD) {
+        if (mode == PSVS_GUI_MODE_OSD) {
             psvs_gui_draw_osd_cpu();
             psvs_gui_draw_osd_fps();
         }
 
         // Draw FULL mode
-        if (psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
+        if (mode == PSVS_GUI_MODE_FULL) {
             psvs_gui_draw_header();
             psvs_gui_draw_cpu_section();
             psvs_gui_draw_memory_section();
