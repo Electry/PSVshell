@@ -168,6 +168,8 @@ void psvs_gui_set_text_scale(float scale) {
 }
 
 static void _psvs_gui_dd_prchar(const char character, int x, int y) {
+    rgba_t color = {.rgba = {0, 255, 0, 255}};
+
     for (int yy = 0; yy < g_gui_font_height * g_gui_font_scale; yy++) {
         int yy_font = yy / g_gui_font_scale;
 
@@ -188,7 +190,7 @@ static void _psvs_gui_dd_prchar(const char character, int x, int y) {
             uint8_t charByte = g_gui_font[charPosH + (xx_font / 8)];
 
             if ((charByte >> (7 - (xx_font % 8))) & 1) {
-                ksceKernelMemcpyKernelToUser((uintptr_t)(px + xx), &g_gui_color_text, sizeof(rgba_t));
+                ksceKernelMemcpyKernelToUser((uintptr_t)(px + xx), &color, sizeof(rgba_t));
             }
         }
     }
@@ -198,13 +200,9 @@ void psvs_gui_dd_fps() {
     char buf[3] = "";
     snprintf(buf, 3, "%d", psvs_perf_get_fps());
 
-    psvs_gui_set_text_color(0, 255, 0, 255);
-
     for (int i = 0; i < 2; i++) {
         _psvs_gui_dd_prchar(buf[i], 10 + i * g_gui_font_width * g_gui_font_scale, 10);
     }
-
-    psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
 void psvs_gui_clear() {
