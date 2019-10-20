@@ -2,16 +2,11 @@
 #define _MAIN_H_
 #include "perf.h"
 
-#define FOR_KERNEL true
-#define FOR_USER   false
-#define POSITIVE   true
-#define NEGATIVE   false
-
-#define DECL_FUNC_HOOK_PATCH_CTRL(index, name, logic, for_kernel) \
+#define DECL_FUNC_HOOK_PATCH_CTRL(index, name) \
     static int name##_patched(int port, SceCtrlData *pad_data, int count) { \
 		int ret = TAI_CONTINUE(int, g_hookrefs[(index)], port, pad_data, count); \
 		if (ret > 0) \
-			psvs_input_check(pad_data, count, logic, for_kernel); \
+			psvs_input_check(pad_data, count); \
 		return ret; \
 	}
 

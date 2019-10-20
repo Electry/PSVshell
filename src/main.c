@@ -42,31 +42,13 @@ int (*_kscePowerSetGpuClockFrequency)(int freq);
 int (*_kscePowerSetGpuEs4ClockFrequency)(int a1, int a2);
 int (*_kscePowerSetGpuXbarClockFrequency)(int freq);
 
-static void psvs_input_check(SceCtrlData *pad_data, int count, bool logic, bool for_kernel) {
-    SceCtrlData kctrl;
-    if (for_kernel) {
-        memcpy(&kctrl, pad_data, sizeof(SceCtrlData));
-    } else {
-        ksceKernelMemcpyUserToKernel(&kctrl, (uintptr_t)pad_data, sizeof(SceCtrlData));
-    }
-
-    // Correct logic
-    if (!logic)
-        kctrl.buttons = ~kctrl.buttons;
-
-    // Check buttons
-    psvs_gui_input_check(kctrl.buttons);
-
+static void psvs_input_check(SceCtrlData *pad_data, int count) {
     // Do not pass input to fg app
     if (psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
-        if (for_kernel) {
-            for (int i = 0; i < count; i++)
-                pad_data[i].buttons = 0;
-        } else {
-            kctrl.buttons = 0;
-            for (int i = 0; i < count; i++)
-                ksceKernelMemcpyKernelToUser((uintptr_t)&pad_data[i].buttons, &kctrl.buttons, sizeof(uint32_t));
-        }
+        SceCtrlData kctrl;
+        kctrl.buttons = 0;
+        for (int i = 0; i < count; i++)
+            ksceKernelMemcpyKernelToUser((uintptr_t)&pad_data[i].buttons, &kctrl.buttons, sizeof(uint32_t));
     }
 }
 
@@ -76,6 +58,14 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
 
     if (index && ksceAppMgrIsExclusiveProcessRunning())
         goto DISPLAY_HOOK_RET; // Do not draw over SceShell overlay
+
+    // Check buttons
+    SceCtrlData kctrl;
+    int ret = ksceCtrlPeekBufferPositive(0, &kctrl, 1);
+    if (ret < 0)
+        ret = ksceCtrlPeekBufferPositive(1, &kctrl, 1);
+    if (ret > 0)
+        psvs_gui_input_check(kctrl.buttons);
 
     if (psvs_gui_get_mode() == PSVS_GUI_MODE_HIDDEN)
         goto DISPLAY_HOOK_RET;
@@ -100,14 +90,14 @@ DISPLAY_HOOK_RET:
     return TAI_CONTINUE(int, g_hookrefs[0], head, index, pParam, sync);
 }
 
-DECL_FUNC_HOOK_PATCH_CTRL(1, ksceCtrlPeekBufferNegative, NEGATIVE, FOR_KERNEL)
-DECL_FUNC_HOOK_PATCH_CTRL(2, sceCtrlPeekBufferNegative2, NEGATIVE, FOR_USER)
-DECL_FUNC_HOOK_PATCH_CTRL(3, ksceCtrlPeekBufferPositive, POSITIVE, FOR_KERNEL)
-DECL_FUNC_HOOK_PATCH_CTRL(4, sceCtrlPeekBufferPositive2, POSITIVE, FOR_USER)
-DECL_FUNC_HOOK_PATCH_CTRL(5, ksceCtrlReadBufferNegative, NEGATIVE, FOR_KERNEL)
-DECL_FUNC_HOOK_PATCH_CTRL(6, sceCtrlReadBufferNegative2, NEGATIVE, FOR_USER)
-DECL_FUNC_HOOK_PATCH_CTRL(7, ksceCtrlReadBufferPositive, POSITIVE, FOR_KERNEL)
-DECL_FUNC_HOOK_PATCH_CTRL(8, sceCtrlReadBufferPositive2, POSITIVE, FOR_USER)
+DECL_FUNC_HOOK_PATCH_CTRL(1, sceCtrlPeekBufferNegative)
+DECL_FUNC_HOOK_PATCH_CTRL(2, sceCtrlPeekBufferNegative2)
+DECL_FUNC_HOOK_PATCH_CTRL(3, sceCtrlPeekBufferPositive)
+DECL_FUNC_HOOK_PATCH_CTRL(4, sceCtrlPeekBufferPositive2)
+DECL_FUNC_HOOK_PATCH_CTRL(5, sceCtrlReadBufferNegative)
+DECL_FUNC_HOOK_PATCH_CTRL(6, sceCtrlReadBufferNegative2)
+DECL_FUNC_HOOK_PATCH_CTRL(7, sceCtrlReadBufferPositive)
+DECL_FUNC_HOOK_PATCH_CTRL(8, sceCtrlReadBufferPositive2)
 
 int kscePowerSetArmClockFrequency_patched(int freq) {
     int ret = ksceKernelLockMutex(g_mutex_cpufreq_uid, 1, NULL);
@@ -222,19 +212,19 @@ int module_start(SceSize argc, const void *args) {
             "SceDisplay", 0x9FED47AC, 0x16466675, ksceDisplaySetFrameBufInternal_patched);
 
     g_hooks[1] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[1],
-            "SceCtrl", 0x7823A5D1, 0x19895843, ksceCtrlPeekBufferNegative_patched);
+            "SceCtrl", 0xD197E3C7, 0x104ED1A7, sceCtrlPeekBufferNegative_patched);
     g_hooks[2] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[2],
             "SceCtrl", 0xD197E3C7, 0x81A89660, sceCtrlPeekBufferNegative2_patched);
     g_hooks[3] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[3],
-            "SceCtrl", 0x7823A5D1, 0xEA1D3A34, ksceCtrlPeekBufferPositive_patched);
+            "SceCtrl", 0xD197E3C7, 0xA9C3CED6, sceCtrlPeekBufferPositive_patched);
     g_hooks[4] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[4],
             "SceCtrl", 0xD197E3C7, 0x15F81E8C, sceCtrlPeekBufferPositive2_patched);
     g_hooks[5] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[5],
-            "SceCtrl", 0x7823A5D1, 0x8D4E0DD1, ksceCtrlReadBufferNegative_patched);
+            "SceCtrl", 0xD197E3C7, 0x15F96FB0, sceCtrlReadBufferNegative_patched);
     g_hooks[6] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[6],
             "SceCtrl", 0xD197E3C7, 0x27A0C5FB, sceCtrlReadBufferNegative2_patched);
     g_hooks[7] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[7],
-            "SceCtrl", 0x7823A5D1, 0x9B96A1AA, ksceCtrlReadBufferPositive_patched);
+            "SceCtrl", 0xD197E3C7, 0x67E7AB83, sceCtrlReadBufferPositive_patched);
     g_hooks[8] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[8],
             "SceCtrl", 0xD197E3C7, 0xC4226A3E, sceCtrlReadBufferPositive2_patched);
 

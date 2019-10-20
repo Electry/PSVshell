@@ -37,6 +37,7 @@ target_link_libraries(${PROJECT_NAME}
   SceSysrootForKernel_stub
   SceAppMgrForDriver_stub
   ScePowerForDriver_stub
+  SceCtrlForDriver_stub
 )
 
 vita_create_self(${PROJECT_NAME}.skprx ${PROJECT_NAME}
