@@ -12,6 +12,7 @@
 #include "gui_font_ter-u24b.h"
 #include "perf.h"
 #include "oc.h"
+#include "profile.h"
 
 int vsnprintf(char *s, size_t n, const char *format, va_list arg);
 
@@ -48,14 +49,14 @@ psvs_gui_mode_t psvs_gui_get_mode() {
 
 static psvs_oc_device_t _psvs_gui_get_device_from_menuctrl(psvs_gui_menu_control_t ctrl) {
     switch (ctrl) {
-        case PSVS_GUI_MENUCTRL_CPU: return PSVS_OC_CPU;
-        case PSVS_GUI_MENUCTRL_GPU_ES4: return PSVS_OC_GPU_ES4;
-        case PSVS_GUI_MENUCTRL_GPU: return PSVS_OC_GPU;
-        case PSVS_GUI_MENUCTRL_BUS: return PSVS_OC_BUS;
-        case PSVS_GUI_MENUCTRL_GPU_XBAR: return PSVS_OC_GPU_XBAR;
-        default: return PSVS_OC_MAX;
+        case PSVS_GUI_MENUCTRL_CPU:      return PSVS_OC_DEVICE_CPU;
+        case PSVS_GUI_MENUCTRL_GPU_ES4:  return PSVS_OC_DEVICE_GPU_ES4;
+        case PSVS_GUI_MENUCTRL_GPU:      return PSVS_OC_DEVICE_GPU;
+        case PSVS_GUI_MENUCTRL_BUS:      return PSVS_OC_DEVICE_BUS;
+        case PSVS_GUI_MENUCTRL_GPU_XBAR: return PSVS_OC_DEVICE_GPU_XBAR;
+        default: return PSVS_OC_DEVICE_MAX;
     }
-    return PSVS_OC_MAX;
+    return PSVS_OC_DEVICE_MAX;
 }
 
 static psvs_oc_device_t _psvs_gui_get_selected_device() {
@@ -84,26 +85,39 @@ void psvs_gui_input_check(uint32_t buttons) {
             g_gui_menu_control--;
         }
 
-        psvs_oc_device_t device = _psvs_gui_get_selected_device();
-
-        // In manual freq mode
-        if (psvs_oc_get_mode(device) == PSVS_OC_MODE_MANUAL) {
-            // Move L/R
-            if (buttons_new & SCE_CTRL_RIGHT) {
-                psvs_oc_change_manual(device, true);
-            } else if (buttons_new & SCE_CTRL_LEFT) {
-                psvs_oc_change_manual(device, false);
-            }
-            // Back to default
-            else if (buttons_new & SCE_CTRL_CROSS) {
-                psvs_oc_set_mode(device, PSVS_OC_MODE_DEFAULT);
+        // Profile label
+        if (g_gui_menu_control == PSVS_GUI_MENUCTRL_PROFILE) {
+            if (buttons_new & SCE_CTRL_CROSS) {
+                if (psvs_oc_has_changed()) {
+                    psvs_profile_save();
+                } else {
+                    psvs_profile_delete();
+                }
             }
         }
-        // In default freq mode
+        // Freq change
         else {
-            if (buttons_new & SCE_CTRL_CROSS) {
-                psvs_oc_reset_manual_for_device(device);
-                psvs_oc_set_mode(device, PSVS_OC_MODE_MANUAL);
+            psvs_oc_device_t device = _psvs_gui_get_selected_device();
+
+            // In manual freq mode
+            if (psvs_oc_get_mode(device) == PSVS_OC_MODE_MANUAL) {
+                // Move L/R
+                if (buttons_new & SCE_CTRL_RIGHT) {
+                    psvs_oc_change_manual(device, true);
+                } else if (buttons_new & SCE_CTRL_LEFT) {
+                    psvs_oc_change_manual(device, false);
+                }
+                // Back to default
+                else if (buttons_new & SCE_CTRL_CROSS) {
+                    psvs_oc_set_mode(device, PSVS_OC_MODE_DEFAULT);
+                }
+            }
+            // In default freq mode
+            else {
+                if (buttons_new & SCE_CTRL_CROSS) {
+                    psvs_oc_reset_manual(device);
+                    psvs_oc_set_mode(device, PSVS_OC_MODE_MANUAL);
+                }
             }
         }
     }
@@ -388,11 +402,11 @@ void psvs_gui_draw_template() {
     psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(44, 4), "PHY:");
 
     // Menu
-    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 5), "CPU [         ]");
-    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 4), "ES4 [         ]");
-    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 3), "GPU [         ]");
-    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 2), "BUS [         ]");
-    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 1), "XBR [         ]");
+    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 6), "CPU [         ]");
+    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 5), "ES4 [         ]");
+    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 4), "GPU [         ]");
+    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 3), "BUS [         ]");
+    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 2), "XBR [         ]");
 }
 
 void psvs_gui_draw_header() {
@@ -484,14 +498,31 @@ static void _psvs_gui_draw_menu_item(int lines, int clock, psvs_gui_menu_control
 }
 
 void psvs_gui_draw_menu() {
-    int r1, r2;
-    _kscePowerGetGpuEs4ClockFrequency(&r1, &r2);
+    _psvs_gui_draw_menu_item(6, psvs_oc_get_freq(PSVS_OC_DEVICE_CPU), PSVS_GUI_MENUCTRL_CPU);
+    _psvs_gui_draw_menu_item(5, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_ES4), PSVS_GUI_MENUCTRL_GPU_ES4);
+    _psvs_gui_draw_menu_item(4, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU), PSVS_GUI_MENUCTRL_GPU);
+    _psvs_gui_draw_menu_item(3, psvs_oc_get_freq(PSVS_OC_DEVICE_BUS), PSVS_GUI_MENUCTRL_BUS);
+    _psvs_gui_draw_menu_item(2, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_XBAR), PSVS_GUI_MENUCTRL_GPU_XBAR);
 
-    _psvs_gui_draw_menu_item(5, _kscePowerGetArmClockFrequency(), PSVS_GUI_MENUCTRL_CPU);
-    _psvs_gui_draw_menu_item(4, r1, PSVS_GUI_MENUCTRL_GPU_ES4);
-    _psvs_gui_draw_menu_item(3, _kscePowerGetGpuClockFrequency(), PSVS_GUI_MENUCTRL_GPU);
-    _psvs_gui_draw_menu_item(2, _kscePowerGetBusClockFrequency(), PSVS_GUI_MENUCTRL_BUS);
-    _psvs_gui_draw_menu_item(1, _kscePowerGetGpuXbarClockFrequency(), PSVS_GUI_MENUCTRL_GPU_XBAR);
+    // Draw profile label separately
+    if (psvs_oc_has_changed()) {
+        psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "   save profile   ");
+    } else {
+        psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "  delete profile  ");
+    }
+    if (g_gui_menu_control == PSVS_GUI_MENUCTRL_PROFILE) {
+        psvs_gui_set_text_color(0, 200, 255, 255);
+        psvs_gui_printf(GUI_ANCHOR_CX(psvs_oc_has_changed() ? 16 : 18), GUI_ANCHOR_BY(10, 1), ">");
+        psvs_gui_printf(GUI_ANCHOR_CX(psvs_oc_has_changed() ? 16 : 18)
+                        + GUI_ANCHOR_LX(0, psvs_oc_has_changed() ? 15 : 17),
+                        GUI_ANCHOR_BY(10, 1), "<");
+        psvs_gui_set_text_color(255, 255, 255, 255);
+    } else {
+        psvs_gui_printf(GUI_ANCHOR_CX(psvs_oc_has_changed() ? 16 : 18), GUI_ANCHOR_BY(10, 1), " ");
+        psvs_gui_printf(GUI_ANCHOR_CX(psvs_oc_has_changed() ? 16 : 18)
+                        + GUI_ANCHOR_LX(0, psvs_oc_has_changed() ? 15 : 17),
+                        GUI_ANCHOR_BY(10, 1), " ");
+    }
 }
 
 int psvs_gui_init() {

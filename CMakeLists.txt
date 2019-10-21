@@ -24,6 +24,7 @@ add_executable(${PROJECT_NAME}
   src/gui.c
   src/perf.c
   src/oc.c
+  src/profile.c
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -38,6 +39,7 @@ target_link_libraries(${PROJECT_NAME}
   SceAppMgrForDriver_stub
   ScePowerForDriver_stub
   SceCtrlForDriver_stub
+  SceIofilemgrForDriver_stub
 )
 
 vita_create_self(${PROJECT_NAME}.skprx ${PROJECT_NAME}

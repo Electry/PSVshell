@@ -1,23 +1,26 @@
 #include <vitasdkkern.h>
 #include <taihen.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "main.h"
 #include "oc.h"
 #include "gui.h"
 #include "perf.h"
+#include "profile.h"
 
 int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintptr_t *addr);
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
 bool ksceAppMgrIsExclusiveProcessRunning();
 
-#define PSVS_MAX_HOOKS 14
+#define PSVS_MAX_HOOKS 15
 static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
 static SceUID         g_hooks[PSVS_MAX_HOOKS];
 static SceUID         g_injects[1];
 
 static SceUID g_mutex_cpufreq_uid = -1;
+static SceUID g_mutex_procevent_uid = -1;
 static SceUID g_thread_uid = -1;
 static bool   g_thread_run = true;
 
@@ -76,7 +79,6 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
     psvs_gui_mode_t mode = psvs_gui_get_mode();
 
     if (mode == PSVS_GUI_MODE_FULL) {
-        ksceKernelGetProcessTitleId(ksceKernelGetProcessId(), g_titleid, sizeof(g_titleid));
         psvs_perf_poll_memory();
     }
 
@@ -106,7 +108,7 @@ int kscePowerSetArmClockFrequency_patched(int freq) {
     if (ret < 0)
         return ret;
 
-    freq = psvs_oc_get_freq(PSVS_OC_CPU, freq);
+    freq = psvs_oc_get_target_freq(PSVS_OC_DEVICE_CPU, freq);
     ret = TAI_CONTINUE(int, g_hookrefs[9], freq);
 
     if (freq > 444 && freq <= 500) {
@@ -119,21 +121,56 @@ int kscePowerSetArmClockFrequency_patched(int freq) {
 }
 
 int kscePowerSetBusClockFrequency_patched(int freq) {
-    return TAI_CONTINUE(int, g_hookrefs[10], psvs_oc_get_freq(PSVS_OC_BUS, freq));
+    return TAI_CONTINUE(int, g_hookrefs[10], psvs_oc_get_target_freq(PSVS_OC_DEVICE_BUS, freq));
 }
 
 int kscePowerSetGpuClockFrequency_patched(int freq) {
-    return TAI_CONTINUE(int, g_hookrefs[11], psvs_oc_get_freq(PSVS_OC_GPU, freq));
+    return TAI_CONTINUE(int, g_hookrefs[11], psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU, freq));
 }
 
 int kscePowerSetGpuEs4ClockFrequency_patched(int a1, int a2) {
-    a1 = psvs_oc_get_freq(PSVS_OC_GPU_ES4, a1);
-    a2 = psvs_oc_get_freq(PSVS_OC_GPU_ES4, a2);
+    a1 = psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_ES4, a1);
+    a2 = psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_ES4, a2);
     return TAI_CONTINUE(int, g_hookrefs[12], a1, a2);
 }
 
 int kscePowerSetGpuXbarClockFrequency_patched(int freq) {
-    return TAI_CONTINUE(int, g_hookrefs[13], psvs_oc_get_freq(PSVS_OC_GPU_XBAR, freq));
+    return TAI_CONTINUE(int, g_hookrefs[13], psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_XBAR, freq));
+}
+
+int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, int *a5, int a6) {
+    char titleid[32];
+    int ret = ksceKernelLockMutex(g_mutex_procevent_uid, 1, NULL);
+    if (ret < 0)
+        goto PROCEVENT_EXIT;
+
+    switch (ev) {
+        case 1: // startup
+        case 5: // resume
+            ksceKernelGetProcessTitleId(pid, titleid, sizeof(titleid));
+            if (!strncmp(titleid, "NPXS", 4))
+                snprintf(titleid, sizeof(titleid), "main");
+            break;
+        case 3: // exit
+        case 4: // suspend
+            snprintf(titleid, sizeof(titleid), "main");
+            break;
+    }
+
+    if (ev == 1 || ev == 5 || ev == 3 || ev == 4) {
+        // Load profile if app changed
+        if (strncmp(g_titleid, titleid, sizeof(g_titleid))) {
+            strncpy(g_titleid, titleid, sizeof(g_titleid));
+            if (!psvs_profile_load()) {
+                psvs_oc_init(); // reset all to default
+            }
+        }
+    }
+
+    ksceKernelUnlockMutex(g_mutex_procevent_uid, 1);
+
+PROCEVENT_EXIT:
+    return TAI_CONTINUE(int, g_hookrefs[14], pid, ev, a3, a4, a5, a6);
 }
 
 static int psvs_thread(SceSize args, void *argp) {
@@ -179,6 +216,7 @@ void _start() __attribute__ ((weak, alias ("module_start")));
 int module_start(SceSize argc, const void *args) {
     int ret = 0;
     psvs_gui_init();
+    psvs_profile_init();
 
     tai_module_info_t tai_info;
     tai_info.size = sizeof(tai_module_info_t);
@@ -210,8 +248,12 @@ int module_start(SceSize argc, const void *args) {
             "ScePower", 0x1590166F, 0xA7739DBE, (uintptr_t *)&_kscePowerSetGpuXbarClockFrequency);
 
     g_mutex_cpufreq_uid = ksceKernelCreateMutex("psvs_mutex_cpufreq", 0, 0, NULL);
+    g_mutex_procevent_uid = ksceKernelCreateMutex("psvs_mutex_procevent", 0, 0, NULL);
 
-    psvs_oc_init();
+    snprintf(g_titleid, sizeof(g_titleid), "main");
+    if (!psvs_profile_load()) {
+        psvs_oc_init(); // reset all to default
+    }
 
     g_hooks[0] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[0],
             "SceDisplay", 0x9FED47AC, 0x16466675, ksceDisplaySetFrameBufInternal_patched);
@@ -243,6 +285,9 @@ int module_start(SceSize argc, const void *args) {
             "ScePower", 0x1590166F, 0x264C24FC, kscePowerSetGpuEs4ClockFrequency_patched);
     g_hooks[13] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[13],
             "ScePower", 0x1590166F, 0xA7739DBE, kscePowerSetGpuXbarClockFrequency_patched);
+
+    g_hooks[14] = taiHookFunctionImportForKernel(KERNEL_PID, &g_hookrefs[14],
+            "SceProcessmgr", 0x887F19D0, 0x414CC813, ksceKernelInvokeProcEventHandler_patched);
 
     ret = module_get_export_func(KERNEL_PID,
             "SceSysmem", 0x63A519E5, 0x3650963F, (uintptr_t *)&SceSysmemForKernel_0x3650963F); // 3.60
@@ -283,6 +328,9 @@ int module_stop(SceSize argc, const void *args) {
 
     if (g_mutex_cpufreq_uid >= 0) {
         ksceKernelDeleteMutex(g_mutex_cpufreq_uid);
+    }
+    if (g_mutex_procevent_uid >= 0) {
+        ksceKernelDeleteMutex(g_mutex_procevent_uid);
     }
 
     psvs_gui_deinit();

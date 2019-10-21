@@ -1,44 +1,68 @@
 #include <vitasdkkern.h>
 #include <taihen.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "main.h"
 #include "oc.h"
 
-#define PSVS_OC_FREQ_CPU_N 8
-static const int PSVS_OC_FREQ_CPU[PSVS_OC_FREQ_CPU_N] = {
-    41, 83, 111, 166, 222, 333, 444, 500
-};
-#define PSVS_OC_FREQ_BUS_N 5
-static const int PSVS_OC_FREQ_BUS[PSVS_OC_FREQ_BUS_N] = {
-    55, 83, 111, 166, 222
-};
-#define PSVS_OC_FREQ_GPU_N 7
-static const int PSVS_OC_FREQ_GPU[PSVS_OC_FREQ_GPU_N] = {
-    41, 55, 83, 111, 166, 222, 333
-};
-#define PSVS_OC_FREQ_GPU_ES4_N 6
-static const int PSVS_OC_FREQ_GPU_ES4[PSVS_OC_FREQ_GPU_ES4_N] = {
-    41, 55, 83, 111, 166, 222
-};
-#define PSVS_OC_FREQ_GPU_XBAR_N 3
-static const int PSVS_OC_FREQ_GPU_XBAR[PSVS_OC_FREQ_GPU_XBAR_N] = {
-    83, 111, 166
-};
-
-static psvs_oc_mode_t g_oc_mode[PSVS_OC_MAX] = {PSVS_OC_MODE_DEFAULT};
-static int g_oc_manual_freq[PSVS_OC_MAX] = {0};
-
-int psvs_oc_get_freq(psvs_oc_device_t device, int default_freq) {
-    return g_oc_mode[device] == PSVS_OC_MODE_MANUAL ? g_oc_manual_freq[device] : default_freq;
+// Declare helper getter/setter for GpuEs4
+static int __kscePowerGetGpuEs4ClockFrequency() {
+    int a1, a2;
+    _kscePowerGetGpuEs4ClockFrequency(&a1, &a2);
+    return a1;
+}
+static int __kscePowerSetGpuEs4ClockFrequency(int freq) {
+    return _kscePowerSetGpuEs4ClockFrequency(freq, freq);
 }
 
-psvs_oc_mode_t psvs_oc_get_mode(psvs_oc_device_t device) {
-    return g_oc_mode[device];
+// Declare static getters/setters
+PSVS_OC_DECL_GETTER(_kscePowerGetArmClockFrequency);
+PSVS_OC_DECL_GETTER(_kscePowerGetBusClockFrequency);
+PSVS_OC_DECL_GETTER(_kscePowerGetGpuClockFrequency);
+PSVS_OC_DECL_GETTER(_kscePowerGetGpuXbarClockFrequency);
+PSVS_OC_DECL_SETTER(_kscePowerSetArmClockFrequency);
+PSVS_OC_DECL_SETTER(_kscePowerSetBusClockFrequency);
+PSVS_OC_DECL_SETTER(_kscePowerSetGpuClockFrequency);
+PSVS_OC_DECL_SETTER(_kscePowerSetGpuXbarClockFrequency);
+
+static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
+    [PSVS_OC_DEVICE_CPU] = {
+        .freq_n = 8, .freq = {41, 83, 111, 166, 222, 333, 444, 500},
+        .get_freq = __kscePowerGetArmClockFrequency,
+        .set_freq = __kscePowerSetArmClockFrequency
+    },
+    [PSVS_OC_DEVICE_GPU_ES4] = {
+        .freq_n = 6, .freq = {41, 55, 83, 111, 166, 222},
+        .get_freq = __kscePowerGetGpuEs4ClockFrequency,
+        .set_freq = __kscePowerSetGpuEs4ClockFrequency
+    },
+    [PSVS_OC_DEVICE_GPU] = {
+        .freq_n = 7, .freq = {41, 55, 83, 111, 166, 222, 333},
+        .get_freq = __kscePowerGetGpuClockFrequency,
+        .set_freq = __kscePowerSetGpuClockFrequency
+    },
+    [PSVS_OC_DEVICE_BUS] = {
+        .freq_n = 5, .freq = {55, 83, 111, 166, 222},
+        .get_freq = __kscePowerGetBusClockFrequency,
+        .set_freq = __kscePowerSetBusClockFrequency
+    },
+    [PSVS_OC_DEVICE_GPU_XBAR] = {
+        .freq_n = 3, .freq = {83, 111, 166},
+        .get_freq = __kscePowerGetGpuXbarClockFrequency,
+        .set_freq = __kscePowerSetGpuXbarClockFrequency
+    },
+};
+
+static psvs_oc_profile_t g_oc = {0};
+static bool g_oc_has_changed = true;
+
+int psvs_oc_get_freq(psvs_oc_device_t device) {
+    return g_oc_devopt[device].get_freq();
 }
 
-void psvs_oc_set_mode(psvs_oc_device_t device, psvs_oc_mode_t mode) {
-    g_oc_mode[device] = mode;
+int psvs_oc_set_freq(psvs_oc_device_t device, int freq) {
+    return g_oc_devopt[device].set_freq(freq);
 }
 
 void psvs_oc_holy_shit() {
@@ -50,65 +74,81 @@ void psvs_oc_holy_shit() {
     *ScePower_41CC = 15;
 }
 
-void psvs_oc_reset_manual_for_device(psvs_oc_device_t device) {
-    int r2;
-    switch (device) {
-        case PSVS_OC_CPU: g_oc_manual_freq[PSVS_OC_CPU] = _kscePowerGetArmClockFrequency(); break;
-        case PSVS_OC_BUS: g_oc_manual_freq[PSVS_OC_BUS] = _kscePowerGetBusClockFrequency(); break;
-        case PSVS_OC_GPU: g_oc_manual_freq[PSVS_OC_GPU] = _kscePowerGetGpuClockFrequency(); break;
-        case PSVS_OC_GPU_ES4: _kscePowerGetGpuEs4ClockFrequency(&g_oc_manual_freq[PSVS_OC_GPU_ES4], &r2); break;
-        case PSVS_OC_GPU_XBAR: g_oc_manual_freq[PSVS_OC_GPU_XBAR] = _kscePowerGetGpuXbarClockFrequency(); break;
-        default: break;
+int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq) {
+    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
+        return g_oc.manual_freq[device];
+    return default_freq;
+}
+
+psvs_oc_mode_t psvs_oc_get_mode(psvs_oc_device_t device) {
+    return g_oc.mode[device];
+}
+
+void psvs_oc_set_mode(psvs_oc_device_t device, psvs_oc_mode_t mode) {
+    g_oc.mode[device] = mode;
+    g_oc_has_changed = true;
+
+    // Refresh manual clocks
+    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
+        psvs_oc_set_freq(device, g_oc.manual_freq[device]);
+}
+
+psvs_oc_profile_t *psvs_oc_get_profile() {
+    return &g_oc;
+}
+
+void psvs_oc_set_profile(psvs_oc_profile_t *oc) {
+    memcpy(&g_oc, oc, sizeof(psvs_oc_profile_t));
+    g_oc_has_changed = false;
+
+    // Refresh manual clocks
+    for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++) {
+        if (g_oc.mode[i] == PSVS_OC_MODE_MANUAL)
+            psvs_oc_set_freq(i, g_oc.manual_freq[i]);
     }
 }
 
-static int _psvs_oc_get_next_freq(psvs_oc_device_t device, bool raise_freq) {
-    const int *table;
-    int size = 0;
-    int target_freq = g_oc_manual_freq[device];
+bool psvs_oc_has_changed() {
+    return g_oc_has_changed;
+}
 
-    switch (device) {
-        case PSVS_OC_CPU:      table = PSVS_OC_FREQ_CPU;      size = PSVS_OC_FREQ_CPU_N;      break;
-        case PSVS_OC_BUS:      table = PSVS_OC_FREQ_BUS;      size = PSVS_OC_FREQ_BUS_N;      break;
-        case PSVS_OC_GPU:      table = PSVS_OC_FREQ_GPU;      size = PSVS_OC_FREQ_GPU_N;      break;
-        case PSVS_OC_GPU_ES4:  table = PSVS_OC_FREQ_GPU_ES4;  size = PSVS_OC_FREQ_GPU_ES4_N;  break;
-        case PSVS_OC_GPU_XBAR: table = PSVS_OC_FREQ_GPU_XBAR; size = PSVS_OC_FREQ_GPU_XBAR_N; break;
-        default: return 0;
-    }
+void psvs_oc_set_changed(bool changed) {
+    g_oc_has_changed = changed;
+}
 
-    for (int i = 0; i < size; i++) {
-        int ii = raise_freq ? i : size - i - 1;
-        if ((raise_freq && table[ii] > target_freq)
-                || (!raise_freq && table[ii] < target_freq)) {
-            target_freq = table[ii];
+void psvs_oc_reset_manual(psvs_oc_device_t device) {
+    g_oc.manual_freq[device] = psvs_oc_get_freq(device);
+    g_oc_has_changed = true;
+}
+
+void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq) {
+    int target_freq = g_oc.manual_freq[device]; // current manual freq
+
+    for (int i = 0; i < g_oc_devopt[device].freq_n; i++) {
+        int ii = raise_freq ? i : g_oc_devopt[device].freq_n - i - 1;
+        if ((raise_freq && g_oc_devopt[device].freq[ii] > target_freq)
+                || (!raise_freq && g_oc_devopt[device].freq[ii] < target_freq)) {
+            target_freq = g_oc_devopt[device].freq[ii];
             break;
         }
     }
 
-    return target_freq;
-}
+    g_oc.manual_freq[device] = target_freq;
+    g_oc_has_changed = true;
 
-void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq) {
-    g_oc_manual_freq[device] = _psvs_oc_get_next_freq(device, raise_freq);
-
-    switch (device) {
-        case PSVS_OC_CPU: _kscePowerSetArmClockFrequency(g_oc_manual_freq[device]); break;
-        case PSVS_OC_BUS: _kscePowerSetBusClockFrequency(g_oc_manual_freq[device]); break;
-        case PSVS_OC_GPU: _kscePowerSetGpuClockFrequency(g_oc_manual_freq[device]); break;
-        case PSVS_OC_GPU_ES4: _kscePowerSetGpuEs4ClockFrequency(
-                                g_oc_manual_freq[device], g_oc_manual_freq[device]); break;
-        case PSVS_OC_GPU_XBAR: _kscePowerSetGpuXbarClockFrequency(g_oc_manual_freq[device]); break;
-        default: break;
-    }
+    // Refresh manual clocks
+    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
+        psvs_oc_set_freq(device, g_oc.manual_freq[device]);
 }
 
 void psvs_oc_init() {
-    for (int i = 0; i < PSVS_OC_MAX; i++)
-        g_oc_mode[i] = PSVS_OC_MODE_DEFAULT;
+    g_oc_has_changed = true;
+    for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++)
+        g_oc.mode[i] = PSVS_OC_MODE_DEFAULT;
 
-    psvs_oc_reset_manual_for_device(PSVS_OC_CPU);
-    psvs_oc_reset_manual_for_device(PSVS_OC_BUS);
-    psvs_oc_reset_manual_for_device(PSVS_OC_GPU);
-    psvs_oc_reset_manual_for_device(PSVS_OC_GPU_ES4);
-    psvs_oc_reset_manual_for_device(PSVS_OC_GPU_XBAR);
+    psvs_oc_reset_manual(PSVS_OC_DEVICE_CPU);
+    psvs_oc_reset_manual(PSVS_OC_DEVICE_BUS);
+    psvs_oc_reset_manual(PSVS_OC_DEVICE_GPU);
+    psvs_oc_reset_manual(PSVS_OC_DEVICE_GPU_ES4);
+    psvs_oc_reset_manual(PSVS_OC_DEVICE_GPU_XBAR);
 }
