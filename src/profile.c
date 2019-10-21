@@ -10,8 +10,8 @@
 #define PSVS_PROFILES_DIR "ux0:data/PSVshell/profiles/"
 
 void psvs_profile_init() {
-	ksceIoMkdir(PSVS_DIR, 0777);
-	ksceIoMkdir(PSVS_PROFILES_DIR, 0777);
+    ksceIoMkdir(PSVS_DIR, 0777);
+    ksceIoMkdir(PSVS_PROFILES_DIR, 0777);
 }
 
 bool psvs_profile_load() {
@@ -19,42 +19,42 @@ bool psvs_profile_load() {
     snprintf(path, 128, "%s%s", PSVS_PROFILES_DIR, g_titleid);
 
     SceUID fd = ksceIoOpen(path, SCE_O_RDONLY, 0777);
-	if (fd < 0)
-	    return false;
+    if (fd < 0)
+        return false;
 
-	psvs_oc_profile_t oc;
-	int bytes = ksceIoRead(fd, &oc, sizeof(psvs_oc_profile_t));
-	ksceIoClose(fd);
+    psvs_oc_profile_t oc;
+    int bytes = ksceIoRead(fd, &oc, sizeof(psvs_oc_profile_t));
+    ksceIoClose(fd);
 
-	if (bytes != sizeof(psvs_oc_profile_t))
-		return false;
+    if (bytes != sizeof(psvs_oc_profile_t))
+        return false;
 
-	psvs_oc_set_profile(&oc);
-	return true;
+    psvs_oc_set_profile(&oc);
+    return true;
 }
 
 bool psvs_profile_save() {
-	char path[128];
+    char path[128];
     snprintf(path, 128, "%s%s", PSVS_PROFILES_DIR, g_titleid);
 
-	SceUID fd = ksceIoOpen(path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
-	if (fd < 0)
-	    return false;
+    SceUID fd = ksceIoOpen(path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+    if (fd < 0)
+        return false;
 
-	int bytes = ksceIoWrite(fd, psvs_oc_get_profile(), sizeof(psvs_oc_profile_t));
-	ksceIoClose(fd);
+    int bytes = ksceIoWrite(fd, psvs_oc_get_profile(), sizeof(psvs_oc_profile_t));
+    ksceIoClose(fd);
 
-	if (bytes != sizeof(psvs_oc_profile_t))
-		return false;
+    if (bytes != sizeof(psvs_oc_profile_t))
+        return false;
 
-	psvs_oc_set_changed(false);
-	return true;
+    psvs_oc_set_changed(false);
+    return true;
 }
 
 bool psvs_profile_delete() {
-	char path[128];
+    char path[128];
     snprintf(path, 128, "%s%s", PSVS_PROFILES_DIR, g_titleid);
 
-	psvs_oc_set_changed(true);
-	return ksceIoRemove(path) >= 0;
+    psvs_oc_set_changed(true);
+    return ksceIoRemove(path) >= 0;
 }
