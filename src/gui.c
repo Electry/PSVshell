@@ -271,18 +271,18 @@ void psvs_gui_printf(int x, int y, const char *format, ...) {
 }
 
 const char *psvs_gui_units_from_size(int bytes) {
-    if (bytes > 1024 * 1024)
+    if (bytes >= 1024 * 1024)
         return "MB";
-    else if (bytes > 1024)
+    else if (bytes >= 1024)
         return "kB";
     else
         return "B";
 }
 
 int psvs_gui_value_from_size(int bytes) {
-    if (bytes > 1024 * 1024)
+    if (bytes >= 1024 * 1024)
         return bytes / 1024 / 1024;
-    else if (bytes > 1024)
+    else if (bytes >= 1024)
         return bytes / 1024;
     else
         return bytes;
@@ -358,7 +358,10 @@ void psvs_gui_draw_osd_cpu() {
 void psvs_gui_draw_osd_fps() {
     int fps = psvs_perf_get_fps();
     psvs_gui_set_text_color2(psvs_gui_scale_color(30 - fps, 0, 30));
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(8, 1), "%2d", fps);
+    if (fps > 99)
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(8, 1), "%3d", fps);
+    else
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(8, 1), "%2d ", fps);
     psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
