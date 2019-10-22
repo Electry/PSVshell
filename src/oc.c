@@ -47,7 +47,11 @@ static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
     },
 };
 
-static psvs_oc_profile_t g_oc = {0};
+static psvs_oc_profile_t g_oc = {
+    .ver = PSVS_VERSION_VER,
+    .mode = {0},
+    .manual_freq = {0}
+};
 static bool g_oc_has_changed = true;
 
 int psvs_oc_get_freq(psvs_oc_device_t device) {

@@ -23,6 +23,7 @@ typedef enum {
 } psvs_oc_mode_t;
 
 typedef struct {
+    char ver[8];
     psvs_oc_mode_t mode[PSVS_OC_DEVICE_MAX];
     int manual_freq[PSVS_OC_DEVICE_MAX];
 } psvs_oc_profile_t;

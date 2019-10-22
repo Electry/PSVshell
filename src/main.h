@@ -2,6 +2,9 @@
 #define _MAIN_H_
 #include "perf.h"
 
+#define PSVS_VERSION_STRING "PSVshell v1.0"
+#define PSVS_VERSION_VER    "PSVS0100"
+
 #define DECL_FUNC_HOOK_PATCH_CTRL(index, name) \
     static int name##_patched(int port, SceCtrlData *pad_data, int count) { \
         int ret = TAI_CONTINUE(int, g_hookrefs[(index)], port, pad_data, count); \

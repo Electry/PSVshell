@@ -385,7 +385,7 @@ void psvs_gui_draw_template() {
 
     // Header
     psvs_gui_set_text_scale(0.5f);
-    psvs_gui_printf(GUI_ANCHOR_CX2(13, 0.5f),     GUI_ANCHOR_TY(8, 0), "PSVshell v1.0");
+    psvs_gui_printf(GUI_ANCHOR_CX2(13, 0.5f),     GUI_ANCHOR_TY(8, 0), PSVS_VERSION_STRING);
     psvs_gui_printf(GUI_ANCHOR_RX2(10, 10, 0.5f), GUI_ANCHOR_TY(8, 0), "by Electry");
     psvs_gui_set_text_scale(1.0f);
 

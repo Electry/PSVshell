@@ -29,6 +29,9 @@ bool psvs_profile_load() {
     if (bytes != sizeof(psvs_oc_profile_t))
         return false;
 
+    if (strncmp(oc.ver, PSVS_VERSION_VER, 8))
+        return false;
+
     psvs_oc_set_profile(&oc);
     return true;
 }
@@ -55,6 +58,9 @@ bool psvs_profile_delete() {
     char path[128];
     snprintf(path, 128, "%s%s", PSVS_PROFILES_DIR, g_titleid);
 
+    if (ksceIoRemove(path) < 0)
+        return false;
+
     psvs_oc_set_changed(true);
-    return ksceIoRemove(path) >= 0;
+    return true;
 }
