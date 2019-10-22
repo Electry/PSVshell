@@ -21,13 +21,11 @@ extern uint32_t *ScePower_41CC;
 
 extern int (*_kscePowerGetArmClockFrequency)();
 extern int (*_kscePowerGetBusClockFrequency)();
-extern int (*_kscePowerGetGpuClockFrequency)();
 extern int (*_kscePowerGetGpuEs4ClockFrequency)(int *a1, int *a2);
 extern int (*_kscePowerGetGpuXbarClockFrequency)();
 
 extern int (*_kscePowerSetArmClockFrequency)(int freq);
 extern int (*_kscePowerSetBusClockFrequency)(int freq);
-extern int (*_kscePowerSetGpuClockFrequency)(int freq);
 extern int (*_kscePowerSetGpuEs4ClockFrequency)(int a1, int a2);
 extern int (*_kscePowerSetGpuXbarClockFrequency)(int freq);
 

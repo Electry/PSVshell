@@ -51,7 +51,6 @@ static psvs_oc_device_t _psvs_gui_get_device_from_menuctrl(psvs_gui_menu_control
     switch (ctrl) {
         case PSVS_GUI_MENUCTRL_CPU:      return PSVS_OC_DEVICE_CPU;
         case PSVS_GUI_MENUCTRL_GPU_ES4:  return PSVS_OC_DEVICE_GPU_ES4;
-        case PSVS_GUI_MENUCTRL_GPU:      return PSVS_OC_DEVICE_GPU;
         case PSVS_GUI_MENUCTRL_BUS:      return PSVS_OC_DEVICE_BUS;
         case PSVS_GUI_MENUCTRL_GPU_XBAR: return PSVS_OC_DEVICE_GPU_XBAR;
         default: return PSVS_OC_DEVICE_MAX;
@@ -402,9 +401,8 @@ void psvs_gui_draw_template() {
     psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(44, 4), "PHY:");
 
     // Menu
-    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 6), "CPU [         ]");
-    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 5), "ES4 [         ]");
-    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 4), "GPU [         ]");
+    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 5), "CPU [         ]");
+    psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 4), "ES4 [         ]");
     psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 3), "BUS [         ]");
     psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 2), "XBR [         ]");
 }
@@ -498,9 +496,8 @@ static void _psvs_gui_draw_menu_item(int lines, int clock, psvs_gui_menu_control
 }
 
 void psvs_gui_draw_menu() {
-    _psvs_gui_draw_menu_item(6, psvs_oc_get_freq(PSVS_OC_DEVICE_CPU), PSVS_GUI_MENUCTRL_CPU);
-    _psvs_gui_draw_menu_item(5, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_ES4), PSVS_GUI_MENUCTRL_GPU_ES4);
-    _psvs_gui_draw_menu_item(4, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU), PSVS_GUI_MENUCTRL_GPU);
+    _psvs_gui_draw_menu_item(5, psvs_oc_get_freq(PSVS_OC_DEVICE_CPU), PSVS_GUI_MENUCTRL_CPU);
+    _psvs_gui_draw_menu_item(4, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_ES4), PSVS_GUI_MENUCTRL_GPU_ES4);
     _psvs_gui_draw_menu_item(3, psvs_oc_get_freq(PSVS_OC_DEVICE_BUS), PSVS_GUI_MENUCTRL_BUS);
     _psvs_gui_draw_menu_item(2, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_XBAR), PSVS_GUI_MENUCTRL_GPU_XBAR);
 

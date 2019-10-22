@@ -14,7 +14,7 @@ int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintp
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
 bool ksceAppMgrIsExclusiveProcessRunning();
 
-#define PSVS_MAX_HOOKS 15
+#define PSVS_MAX_HOOKS 14
 static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
 static SceUID         g_hooks[PSVS_MAX_HOOKS];
 static SceUID         g_injects[1];
@@ -35,13 +35,11 @@ uint32_t *ScePower_41CC = NULL;
 
 int (*_kscePowerGetArmClockFrequency)();
 int (*_kscePowerGetBusClockFrequency)();
-int (*_kscePowerGetGpuClockFrequency)();
 int (*_kscePowerGetGpuEs4ClockFrequency)(int *a1, int *a2);
 int (*_kscePowerGetGpuXbarClockFrequency)();
 
 int (*_kscePowerSetArmClockFrequency)(int freq);
 int (*_kscePowerSetBusClockFrequency)(int freq);
-int (*_kscePowerSetGpuClockFrequency)(int freq);
 int (*_kscePowerSetGpuEs4ClockFrequency)(int a1, int a2);
 int (*_kscePowerSetGpuXbarClockFrequency)(int freq);
 
@@ -124,18 +122,14 @@ int kscePowerSetBusClockFrequency_patched(int freq) {
     return TAI_CONTINUE(int, g_hookrefs[10], psvs_oc_get_target_freq(PSVS_OC_DEVICE_BUS, freq));
 }
 
-int kscePowerSetGpuClockFrequency_patched(int freq) {
-    return TAI_CONTINUE(int, g_hookrefs[11], psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU, freq));
-}
-
 int kscePowerSetGpuEs4ClockFrequency_patched(int a1, int a2) {
     a1 = psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_ES4, a1);
     a2 = psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_ES4, a2);
-    return TAI_CONTINUE(int, g_hookrefs[12], a1, a2);
+    return TAI_CONTINUE(int, g_hookrefs[11], a1, a2);
 }
 
 int kscePowerSetGpuXbarClockFrequency_patched(int freq) {
-    return TAI_CONTINUE(int, g_hookrefs[13], psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_XBAR, freq));
+    return TAI_CONTINUE(int, g_hookrefs[12], psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_XBAR, freq));
 }
 
 int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, int *a5, int a6) {
@@ -170,7 +164,7 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
     ksceKernelUnlockMutex(g_mutex_procevent_uid, 1);
 
 PROCEVENT_EXIT:
-    return TAI_CONTINUE(int, g_hookrefs[14], pid, ev, a3, a4, a5, a6);
+    return TAI_CONTINUE(int, g_hookrefs[13], pid, ev, a3, a4, a5, a6);
 }
 
 static int psvs_thread(SceSize args, void *argp) {
@@ -230,8 +224,6 @@ int module_start(SceSize argc, const void *args) {
     module_get_export_func(KERNEL_PID,
             "ScePower", 0x1590166F, 0x478FE6F5, (uintptr_t *)&_kscePowerGetBusClockFrequency);
     module_get_export_func(KERNEL_PID,
-            "ScePower", 0x1590166F, 0x64641E6A, (uintptr_t *)&_kscePowerGetGpuClockFrequency);
-    module_get_export_func(KERNEL_PID,
             "ScePower", 0x1590166F, 0x475BCC82, (uintptr_t *)&_kscePowerGetGpuEs4ClockFrequency);
     module_get_export_func(KERNEL_PID,
             "ScePower", 0x1590166F, 0x0A750DEE, (uintptr_t *)&_kscePowerGetGpuXbarClockFrequency);
@@ -240,8 +232,6 @@ int module_start(SceSize argc, const void *args) {
             "ScePower", 0x1590166F, 0x74DB5AE5, (uintptr_t *)&_kscePowerSetArmClockFrequency);
     module_get_export_func(KERNEL_PID,
             "ScePower", 0x1590166F, 0xB8D7B3FB, (uintptr_t *)&_kscePowerSetBusClockFrequency);
-    module_get_export_func(KERNEL_PID,
-            "ScePower", 0x1590166F, 0x621BD8FD, (uintptr_t *)&_kscePowerSetGpuClockFrequency);
     module_get_export_func(KERNEL_PID,
             "ScePower", 0x1590166F, 0x264C24FC, (uintptr_t *)&_kscePowerSetGpuEs4ClockFrequency);
     module_get_export_func(KERNEL_PID,
@@ -280,13 +270,11 @@ int module_start(SceSize argc, const void *args) {
     g_hooks[10] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[10],
             "ScePower", 0x1590166F, 0xB8D7B3FB, kscePowerSetBusClockFrequency_patched);
     g_hooks[11] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[11],
-            "ScePower", 0x1590166F, 0x621BD8FD, kscePowerSetGpuClockFrequency_patched);
-    g_hooks[12] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[12],
             "ScePower", 0x1590166F, 0x264C24FC, kscePowerSetGpuEs4ClockFrequency_patched);
-    g_hooks[13] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[13],
+    g_hooks[12] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[12],
             "ScePower", 0x1590166F, 0xA7739DBE, kscePowerSetGpuXbarClockFrequency_patched);
 
-    g_hooks[14] = taiHookFunctionImportForKernel(KERNEL_PID, &g_hookrefs[14],
+    g_hooks[13] = taiHookFunctionImportForKernel(KERNEL_PID, &g_hookrefs[13],
             "SceProcessmgr", 0x887F19D0, 0x414CC813, ksceKernelInvokeProcEventHandler_patched);
 
     ret = module_get_export_func(KERNEL_PID,

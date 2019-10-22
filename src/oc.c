@@ -19,11 +19,9 @@ static int __kscePowerSetGpuEs4ClockFrequency(int freq) {
 // Declare static getters/setters
 PSVS_OC_DECL_GETTER(_kscePowerGetArmClockFrequency);
 PSVS_OC_DECL_GETTER(_kscePowerGetBusClockFrequency);
-PSVS_OC_DECL_GETTER(_kscePowerGetGpuClockFrequency);
 PSVS_OC_DECL_GETTER(_kscePowerGetGpuXbarClockFrequency);
 PSVS_OC_DECL_SETTER(_kscePowerSetArmClockFrequency);
 PSVS_OC_DECL_SETTER(_kscePowerSetBusClockFrequency);
-PSVS_OC_DECL_SETTER(_kscePowerSetGpuClockFrequency);
 PSVS_OC_DECL_SETTER(_kscePowerSetGpuXbarClockFrequency);
 
 static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
@@ -36,11 +34,6 @@ static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
         .freq_n = 6, .freq = {41, 55, 83, 111, 166, 222},
         .get_freq = __kscePowerGetGpuEs4ClockFrequency,
         .set_freq = __kscePowerSetGpuEs4ClockFrequency
-    },
-    [PSVS_OC_DEVICE_GPU] = {
-        .freq_n = 7, .freq = {41, 55, 83, 111, 166, 222, 333},
-        .get_freq = __kscePowerGetGpuClockFrequency,
-        .set_freq = __kscePowerSetGpuClockFrequency
     },
     [PSVS_OC_DEVICE_BUS] = {
         .freq_n = 5, .freq = {55, 83, 111, 166, 222},
@@ -148,7 +141,6 @@ void psvs_oc_init() {
 
     psvs_oc_reset_manual(PSVS_OC_DEVICE_CPU);
     psvs_oc_reset_manual(PSVS_OC_DEVICE_BUS);
-    psvs_oc_reset_manual(PSVS_OC_DEVICE_GPU);
     psvs_oc_reset_manual(PSVS_OC_DEVICE_GPU_ES4);
     psvs_oc_reset_manual(PSVS_OC_DEVICE_GPU_XBAR);
 }

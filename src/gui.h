@@ -3,7 +3,7 @@
 
 // scaling done internally
 #define GUI_WIDTH  308
-#define GUI_HEIGHT 332
+#define GUI_HEIGHT 308
 
 #define GUI_OSD_HEIGHT 64
 
@@ -43,7 +43,6 @@ typedef enum {
 typedef enum {
     PSVS_GUI_MENUCTRL_CPU,
     PSVS_GUI_MENUCTRL_GPU_ES4,
-    PSVS_GUI_MENUCTRL_GPU,
     PSVS_GUI_MENUCTRL_BUS,
     PSVS_GUI_MENUCTRL_GPU_XBAR,
     PSVS_GUI_MENUCTRL_PROFILE,
