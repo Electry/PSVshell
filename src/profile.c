@@ -7,11 +7,11 @@
 #include "main.h"
 #include "oc.h"
 
-#define PSVS_DIR          "ux0:data/PSVshell/"
-#define PSVS_PROFILES_DIR "ux0:data/PSVshell/profiles/"
+#define PSVS_PROFILES_DIR "ur0:data/PSVshell/profiles/"
 
 void psvs_profile_init() {
-    ksceIoMkdir(PSVS_DIR, 0777);
+    ksceIoMkdir("ur0:data/", 0777);
+    ksceIoMkdir("ur0:data/PSVshell/", 0777);
     ksceIoMkdir(PSVS_PROFILES_DIR, 0777);
 }
 
