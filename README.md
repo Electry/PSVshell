@@ -14,7 +14,7 @@ Yet another overclocking plugin
 - Does not slow down games when menu is open
 - Does not crash Adrenaline
 - Clean code and patches
-- **3.60** and **3.65** fws are supported, **any other will bootloop!** (hold LT on boot if that happens -- you shouldn't be using other fws anyway)
+- **3.60** and **3.65** fws are supported
 
 ### How to use:
 - Press SELECT + UP/DOWN to toggle between 3 GUI modes
