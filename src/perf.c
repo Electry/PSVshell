@@ -1,5 +1,6 @@
 #include <vitasdkkern.h>
 #include <taihen.h>
+#include <stdbool.h>
 
 #include "main.h"
 

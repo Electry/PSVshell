@@ -2,6 +2,7 @@
 #include <taihen.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "main.h"
 #include "oc.h"

@@ -25,6 +25,10 @@ static SceUID g_thread_uid = -1;
 static bool   g_thread_run = true;
 
 char g_titleid[32] = "";
+bool g_is_in_pspemu = false;
+
+SceUID (*_ksceKernelGetProcessMainModule)(SceUID pid);
+int (*_ksceKernelGetModuleInfo)(SceUID pid, SceUID modid, SceKernelModuleInfo *info);
 
 int (*SceSysmemForKernel_0x3650963F)(uint32_t a1, SceSysmemAddressSpaceInfo *a2);
 int (*SceThreadmgrForDriver_0x7E280B69)(SceKernelSystemInfo *pInfo);
@@ -57,16 +61,11 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
     if (!head || !pParam)
         goto DISPLAY_HOOK_RET;
 
+    if (g_is_in_pspemu)
+        goto DISPLAY_HOOK_RET;
+
     if (index && ksceAppMgrIsExclusiveProcessRunning())
         goto DISPLAY_HOOK_RET; // Do not draw over SceShell overlay
-
-    // Check buttons
-    SceCtrlData kctrl;
-    int ret = ksceCtrlPeekBufferPositive(0, &kctrl, 1);
-    if (ret < 0)
-        ret = ksceCtrlPeekBufferPositive(1, &kctrl, 1);
-    if (ret > 0)
-        psvs_gui_input_check(kctrl.buttons);
 
     if (psvs_gui_get_mode() == PSVS_GUI_MODE_HIDDEN)
         goto DISPLAY_HOOK_RET;
@@ -133,7 +132,7 @@ int kscePowerSetGpuXbarClockFrequency_patched(int freq) {
 }
 
 int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, int *a5, int a6) {
-    char titleid[32];
+    char titleid[sizeof(g_titleid)];
     int ret = ksceKernelLockMutex(g_mutex_procevent_uid, 1, NULL);
     if (ret < 0)
         goto PROCEVENT_EXIT;
@@ -142,11 +141,25 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
         case 1: // startup
         case 5: // resume
             ksceKernelGetProcessTitleId(pid, titleid, sizeof(titleid));
-            if (!strncmp(titleid, "NPXS", 4))
+
+            // Use 'main' title for all system apps
+            if (!strncmp(titleid, "NPXS", 4)) {
                 snprintf(titleid, sizeof(titleid), "main");
+            }
+
+            // Check if pid is PspEmu
+            SceKernelModuleInfo info;
+            info.size = sizeof(SceKernelModuleInfo);
+            _ksceKernelGetModuleInfo(pid, _ksceKernelGetProcessMainModule(pid), &info);
+            if (!strncmp(info.module_name, "ScePspemu", 9)) {
+                g_is_in_pspemu = true;
+                snprintf(titleid, sizeof(titleid), "ScePspemu");
+            }
             break;
+
         case 3: // exit
         case 4: // suspend
+            g_is_in_pspemu = false;
             snprintf(titleid, sizeof(titleid), "main");
             break;
     }
@@ -156,7 +169,8 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
         if (strncmp(g_titleid, titleid, sizeof(g_titleid))) {
             strncpy(g_titleid, titleid, sizeof(g_titleid));
             if (!psvs_profile_load()) {
-                psvs_oc_init(); // reset all to default
+                // If no profile exists, reset all options to default
+                psvs_oc_init();
             }
         }
     }
@@ -169,6 +183,16 @@ PROCEVENT_EXIT:
 
 static int psvs_thread(SceSize args, void *argp) {
     while (g_thread_run) {
+        // Check buttons
+        if (!g_is_in_pspemu) {
+            SceCtrlData kctrl;
+            int ret = ksceCtrlPeekBufferPositive(0, &kctrl, 1);
+            if (ret < 0)
+                ret = ksceCtrlPeekBufferPositive(1, &kctrl, 1);
+            if (ret > 0)
+                psvs_gui_input_check(kctrl.buttons);
+        }
+
         bool fb_or_mode_changed = psvs_gui_mode_changed() || psvs_gui_fb_res_changed();
         psvs_gui_mode_t mode = psvs_gui_get_mode();
 
@@ -241,9 +265,8 @@ int module_start(SceSize argc, const void *args) {
     g_mutex_procevent_uid = ksceKernelCreateMutex("psvs_mutex_procevent", 0, 0, NULL);
 
     snprintf(g_titleid, sizeof(g_titleid), "main");
-    if (!psvs_profile_load()) {
+    if (!psvs_profile_load())
         psvs_oc_init(); // reset all to default
-    }
 
     g_hooks[0] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[0],
             "SceDisplay", 0x9FED47AC, 0x16466675, ksceDisplaySetFrameBufInternal_patched);
@@ -278,6 +301,19 @@ int module_start(SceSize argc, const void *args) {
             "SceProcessmgr", 0x887F19D0, 0x414CC813, ksceKernelInvokeProcEventHandler_patched);
 
     ret = module_get_export_func(KERNEL_PID,
+            "SceKernelModulemgr", 0xC445FA63, 0x20A27FA9, (uintptr_t *)&_ksceKernelGetProcessMainModule); // 3.60
+    if (ret < 0) {
+        module_get_export_func(KERNEL_PID,
+            "SceKernelModulemgr", 0x92C9FFC2, 0x679F5144, (uintptr_t *)&_ksceKernelGetProcessMainModule); // 3.65
+    }
+    ret = module_get_export_func(KERNEL_PID,
+            "SceKernelModulemgr", 0xC445FA63, 0xD269F915, (uintptr_t *)&_ksceKernelGetModuleInfo); // 3.60
+    if (ret < 0) {
+        module_get_export_func(KERNEL_PID,
+            "SceKernelModulemgr", 0x92C9FFC2, 0xDAA90093, (uintptr_t *)&_ksceKernelGetModuleInfo); // 3.65
+    }
+
+    ret = module_get_export_func(KERNEL_PID,
             "SceSysmem", 0x63A519E5, 0x3650963F, (uintptr_t *)&SceSysmemForKernel_0x3650963F); // 3.60
     if (ret < 0) {
         module_get_export_func(KERNEL_PID,
@@ -310,16 +346,13 @@ int module_stop(SceSize argc, const void *args) {
             taiHookReleaseForKernel(g_hooks[i], g_hookrefs[i]);
     }
 
-    if (g_injects[0] >= 0) {
+    if (g_injects[0] >= 0)
         taiInjectReleaseForKernel(g_injects[0]);
-    }
 
-    if (g_mutex_cpufreq_uid >= 0) {
+    if (g_mutex_cpufreq_uid >= 0)
         ksceKernelDeleteMutex(g_mutex_cpufreq_uid);
-    }
-    if (g_mutex_procevent_uid >= 0) {
+    if (g_mutex_procevent_uid >= 0)
         ksceKernelDeleteMutex(g_mutex_procevent_uid);
-    }
 
     psvs_gui_deinit();
 

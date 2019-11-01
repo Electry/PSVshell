@@ -140,11 +140,8 @@ void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq) {
 
 void psvs_oc_init() {
     g_oc_has_changed = true;
-    for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++)
+    for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++) {
         g_oc.mode[i] = PSVS_OC_MODE_DEFAULT;
-
-    psvs_oc_reset_manual(PSVS_OC_DEVICE_CPU);
-    psvs_oc_reset_manual(PSVS_OC_DEVICE_BUS);
-    psvs_oc_reset_manual(PSVS_OC_DEVICE_GPU_ES4);
-    psvs_oc_reset_manual(PSVS_OC_DEVICE_GPU_XBAR);
+        psvs_oc_reset_manual(i);
+    }
 }
