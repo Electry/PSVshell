@@ -140,12 +140,10 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
     switch (ev) {
         case 1: // startup
         case 5: // resume
-            ksceKernelGetProcessTitleId(pid, titleid, sizeof(titleid));
-
-            // Use 'main' title for all system apps
-            if (!strncmp(titleid, "NPXS", 4)) {
-                snprintf(titleid, sizeof(titleid), "main");
-            }
+            // Ignore startup events if exclusive proc is already running
+            if (ksceAppMgrIsExclusiveProcessRunning()
+                    && strncmp(g_titleid, "main", 4) != 0)
+                goto PROCEVENT_UNLOCK_EXIT;
 
             // Check if pid is PspEmu
             SceKernelModuleInfo info;
@@ -154,7 +152,14 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
             if (!strncmp(info.module_name, "ScePspemu", 9)) {
                 g_is_in_pspemu = true;
                 snprintf(titleid, sizeof(titleid), "ScePspemu");
+                break;
             }
+
+            // Check titleid
+            ksceKernelGetProcessTitleId(pid, titleid, sizeof(titleid));
+            if (!strncmp(titleid, "NPXS", 4))
+                goto PROCEVENT_UNLOCK_EXIT;
+
             break;
 
         case 3: // exit
@@ -168,13 +173,15 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
         // Load profile if app changed
         if (strncmp(g_titleid, titleid, sizeof(g_titleid))) {
             strncpy(g_titleid, titleid, sizeof(g_titleid));
-            if (!psvs_profile_load()) {
-                // If no profile exists, reset all options to default
+            if (g_is_in_pspemu || !psvs_profile_load()) {
+                // If no profile exists or in PspEmu,
+                // reset all options to default
                 psvs_oc_init();
             }
         }
     }
 
+PROCEVENT_UNLOCK_EXIT:
     ksceKernelUnlockMutex(g_mutex_procevent_uid, 1);
 
 PROCEVENT_EXIT:
