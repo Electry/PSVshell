@@ -67,13 +67,12 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
     if (index && ksceAppMgrIsExclusiveProcessRunning())
         goto DISPLAY_HOOK_RET; // Do not draw over SceShell overlay
 
-    if (psvs_gui_get_mode() == PSVS_GUI_MODE_HIDDEN)
+    psvs_gui_mode_t mode = psvs_gui_get_mode();
+    if (mode == PSVS_GUI_MODE_HIDDEN)
         goto DISPLAY_HOOK_RET;
 
     psvs_perf_calc_fps();
     psvs_gui_set_framebuf(pParam);
-
-    psvs_gui_mode_t mode = psvs_gui_get_mode();
 
     if (mode == PSVS_GUI_MODE_FULL) {
         psvs_perf_poll_memory();
@@ -190,15 +189,19 @@ PROCEVENT_EXIT:
 
 static int psvs_thread(SceSize args, void *argp) {
     while (g_thread_run) {
-        // Check buttons
-        if (!g_is_in_pspemu) {
-            SceCtrlData kctrl;
-            int ret = ksceCtrlPeekBufferPositive(0, &kctrl, 1);
-            if (ret < 0)
-                ret = ksceCtrlPeekBufferPositive(1, &kctrl, 1);
-            if (ret > 0)
-                psvs_gui_input_check(kctrl.buttons);
+        if (g_is_in_pspemu) {
+            // Don't do anything if PspEmu is running
+            ksceKernelDelayThread(200 * 1000);
+            continue;
         }
+
+        // Check buttons
+        SceCtrlData kctrl;
+        int ret = ksceCtrlPeekBufferPositive(0, &kctrl, 1);
+        if (ret < 0)
+            ret = ksceCtrlPeekBufferPositive(1, &kctrl, 1);
+        if (ret > 0)
+            psvs_gui_input_check(kctrl.buttons);
 
         bool fb_or_mode_changed = psvs_gui_mode_changed() || psvs_gui_fb_res_changed();
         psvs_gui_mode_t mode = psvs_gui_get_mode();
