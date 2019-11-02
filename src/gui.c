@@ -210,10 +210,11 @@ static void _psvs_gui_dd_prchar(const char character, int x, int y) {
 }
 
 void psvs_gui_dd_fps() {
-    char buf[3] = "";
-    snprintf(buf, 3, "%d", psvs_perf_get_fps());
+    char buf[4] = "";
+    snprintf(buf, 4, "%d", psvs_perf_get_fps());
+    size_t len = strlen(buf);
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < len; i++) {
         _psvs_gui_dd_prchar(buf[i], 10 + i * g_gui_font_width * g_gui_font_scale, 10);
     }
 }
