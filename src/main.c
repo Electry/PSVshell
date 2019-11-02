@@ -163,6 +163,11 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
 
         case 3: // exit
         case 4: // suspend
+            // Check titleid
+            ksceKernelGetProcessTitleId(pid, titleid, sizeof(titleid));
+            if (!strncmp(titleid, "NPXS", 4))
+                goto PROCEVENT_UNLOCK_EXIT;
+
             g_is_in_pspemu = false;
             snprintf(titleid, sizeof(titleid), "main");
             break;
