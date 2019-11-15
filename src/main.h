@@ -13,6 +13,16 @@
         return ret; \
     }
 
+#define DECL_FUNC_HOOK_PATCH_FREQ_GETTER(index, name, device) \
+    static int name##_patched() { \
+        uint32_t state; \
+        ENTER_SYSCALL(state); \
+        TAI_CONTINUE(int, g_hookrefs[(index)]); \
+        int freq = psvs_oc_get_freq((device));  \
+        EXIT_SYSCALL(state); \
+        return freq; \
+    }
+
 extern char g_titleid[32];
 extern bool g_is_in_pspemu;
 
