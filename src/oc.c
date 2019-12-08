@@ -5,6 +5,7 @@
 
 #include "main.h"
 #include "oc.h"
+#include "log.h"
 
 // Declare helper getter/setter for GpuEs4
 static int __kscePowerGetGpuEs4ClockFrequency() {
@@ -63,6 +64,8 @@ int psvs_oc_set_freq(psvs_oc_device_t device, int freq) {
 }
 
 void psvs_oc_holy_shit() {
+    psvs_log_printf("psvs_oc_holy_shit()\n");
+
     // Apply mul:div (15:0)
     ScePervasiveForDriver_0xE9D95643(15, 16 - 0);
 
@@ -82,6 +85,8 @@ psvs_oc_mode_t psvs_oc_get_mode(psvs_oc_device_t device) {
 }
 
 void psvs_oc_set_mode(psvs_oc_device_t device, psvs_oc_mode_t mode) {
+    psvs_log_printf("psvs_oc_set_mode(%d, %d)\n", device, mode);
+
     g_oc.mode[device] = mode;
     g_oc_has_changed = true;
 
@@ -95,6 +100,12 @@ psvs_oc_profile_t *psvs_oc_get_profile() {
 }
 
 void psvs_oc_set_profile(psvs_oc_profile_t *oc) {
+    psvs_log_printf("psvs_oc_set_profile(%d:%d, %d:%d, %d:%d, %d:%d)\n",
+            oc->mode[0], oc->manual_freq[0],
+            oc->mode[1], oc->manual_freq[1],
+            oc->mode[2], oc->manual_freq[2],
+            oc->mode[3], oc->manual_freq[3]);
+
     memcpy(&g_oc, oc, sizeof(psvs_oc_profile_t));
     g_oc_has_changed = false;
 
@@ -139,6 +150,7 @@ void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq) {
 }
 
 void psvs_oc_init() {
+    psvs_log_printf("psvs_oc_init()\n");
     g_oc_has_changed = true;
     for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++) {
         g_oc.mode[i] = PSVS_OC_MODE_DEFAULT;

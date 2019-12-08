@@ -6,6 +6,7 @@
 
 #include "main.h"
 #include "oc.h"
+#include "log.h"
 
 #define PSVS_PROFILES_DIR "ur0:data/PSVshell/profiles/"
 
@@ -19,13 +20,16 @@ bool psvs_profile_load() {
     char path[128];
     snprintf(path, 128, "%s%s", PSVS_PROFILES_DIR, g_titleid);
 
-    SceUID fd = ksceIoOpen(path, SCE_O_RDONLY, 0777);
-    if (fd < 0)
+    SceUID fd = ksceIoOpen(path, SCE_O_RDONLY, 0);
+    if (fd < 0) {
+        psvs_log_printf("psvs_profile_load(): failed to open '%s'! 0x%X\n", path, fd);
         return false;
+    }
 
     psvs_oc_profile_t oc;
     int bytes = ksceIoRead(fd, &oc, sizeof(psvs_oc_profile_t));
     ksceIoClose(fd);
+    psvs_log_printf("psvs_profile_load(): read %d bytes from '%s'\n", bytes, path);
 
     if (bytes != sizeof(psvs_oc_profile_t))
         return false;
@@ -42,11 +46,14 @@ bool psvs_profile_save() {
     snprintf(path, 128, "%s%s", PSVS_PROFILES_DIR, g_titleid);
 
     SceUID fd = ksceIoOpen(path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
-    if (fd < 0)
+    if (fd < 0) {
+        psvs_log_printf("psvs_profile_save(): failed to open '%s'! 0x%X\n", path, fd);
         return false;
+    }
 
     int bytes = ksceIoWrite(fd, psvs_oc_get_profile(), sizeof(psvs_oc_profile_t));
     ksceIoClose(fd);
+    psvs_log_printf("psvs_profile_save(): written %d bytes to '%s'\n", bytes, path);
 
     if (bytes != sizeof(psvs_oc_profile_t))
         return false;
@@ -59,7 +66,9 @@ bool psvs_profile_delete() {
     char path[128];
     snprintf(path, 128, "%s%s", PSVS_PROFILES_DIR, g_titleid);
 
-    if (ksceIoRemove(path) < 0)
+    int ret = ksceIoRemove(path);
+    psvs_log_printf("psvs_profile_delete(): deleting '%s': 0x%X\n", path, ret);
+    if (ret < 0)
         return false;
 
     psvs_oc_set_changed(true);

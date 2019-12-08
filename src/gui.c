@@ -379,6 +379,7 @@ void psvs_gui_draw_osd_fps() {
     psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
+extern int g_fd;
 void psvs_gui_draw_template() {
     psvs_gui_set_back_color(0, 0, 0, 255);
     psvs_gui_set_text_color(255, 255, 255, 255);
@@ -387,7 +388,7 @@ void psvs_gui_draw_template() {
     // Header
     psvs_gui_set_text_scale(0.5f);
     psvs_gui_printf(GUI_ANCHOR_CX2(13, 0.5f),     GUI_ANCHOR_TY(8, 0), PSVS_VERSION_STRING);
-    psvs_gui_printf(GUI_ANCHOR_RX2(10, 10, 0.5f), GUI_ANCHOR_TY(8, 0), "by Electry");
+    psvs_gui_printf(GUI_ANCHOR_RX2(10, 10, 0.5f), GUI_ANCHOR_TY(8, 0), "0x%X", g_fd);
     psvs_gui_set_text_scale(1.0f);
 
     // CPU / Temp

@@ -9,6 +9,7 @@
 #include "gui.h"
 #include "perf.h"
 #include "profile.h"
+#include "log.h"
 
 int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintptr_t *addr);
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
@@ -101,8 +102,10 @@ DECL_FUNC_HOOK_PATCH_CTRL(8, sceCtrlReadBufferPositive2)
 
 int kscePowerSetArmClockFrequency_patched(int freq) {
     int ret = ksceKernelLockMutex(g_mutex_cpufreq_uid, 1, NULL);
-    if (ret < 0)
+    if (ret < 0) {
+        psvs_log_printf("kscePowerSetArmClockFrequency_patched(): failed to lock mutex! 0x%X\n", ret);
         return ret;
+    }
 
     freq = psvs_oc_get_target_freq(PSVS_OC_DEVICE_CPU, freq);
     ret = TAI_CONTINUE(int, g_hookrefs[9], freq);
@@ -112,22 +115,31 @@ int kscePowerSetArmClockFrequency_patched(int freq) {
         ret = 0;
     }
 
+    psvs_log_printf("kscePowerSetArmClockFrequency_patched( %d ): 0x%X\n", freq, ret);
     ksceKernelUnlockMutex(g_mutex_cpufreq_uid, 1);
     return ret;
 }
 
 int kscePowerSetBusClockFrequency_patched(int freq) {
-    return TAI_CONTINUE(int, g_hookrefs[10], psvs_oc_get_target_freq(PSVS_OC_DEVICE_BUS, freq));
+    freq = psvs_oc_get_target_freq(PSVS_OC_DEVICE_BUS, freq);
+    int ret = TAI_CONTINUE(int, g_hookrefs[10], freq);
+    psvs_log_printf("kscePowerSetBusClockFrequency_patched( %d ): 0x%X\n", freq, ret);
+    return ret;
 }
 
 int kscePowerSetGpuEs4ClockFrequency_patched(int a1, int a2) {
     a1 = psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_ES4, a1);
     a2 = psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_ES4, a2);
-    return TAI_CONTINUE(int, g_hookrefs[11], a1, a2);
+    int ret = TAI_CONTINUE(int, g_hookrefs[11], a1, a2);
+    //psvs_log_printf("kscePowerSetGpuEs4ClockFrequency_patched( %d, %d ): 0x%X\n", a1, a2, ret);
+    return ret;
 }
 
 int kscePowerSetGpuXbarClockFrequency_patched(int freq) {
-    return TAI_CONTINUE(int, g_hookrefs[12], psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_XBAR, freq));
+    freq = psvs_oc_get_target_freq(PSVS_OC_DEVICE_GPU_XBAR, freq);
+    int ret = TAI_CONTINUE(int, g_hookrefs[12], freq);
+    psvs_log_printf("kscePowerSetGpuXbarClockFrequency_patched( %d ): 0x%X\n", freq, ret);
+    return ret;
 }
 
 DECL_FUNC_HOOK_PATCH_FREQ_GETTER(14, scePowerGetArmClockFrequency,     PSVS_OC_DEVICE_CPU)
@@ -138,8 +150,10 @@ DECL_FUNC_HOOK_PATCH_FREQ_GETTER(17, scePowerGetGpuXbarClockFrequency, PSVS_OC_D
 int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, int *a5, int a6) {
     char titleid[sizeof(g_titleid)];
     int ret = ksceKernelLockMutex(g_mutex_procevent_uid, 1, NULL);
-    if (ret < 0)
+    if (ret < 0) {
+        psvs_log_printf("ksceKernelInvokeProcEventHandler_patched(): failed to lock mutex! 0x%X\n", ret);
         goto PROCEVENT_EXIT;
+    }
 
     switch (ev) {
         case 1: // startup
@@ -155,6 +169,7 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
             _ksceKernelGetModuleInfo(pid, _ksceKernelGetProcessMainModule(pid), &info);
             if (!strncmp(info.module_name, "ScePspemu", 9)) {
                 g_is_in_pspemu = true;
+                psvs_log_printf("ksceKernelInvokeProcEventHandler_patched(): g_is_in_pspemu = true\n");
                 snprintf(titleid, sizeof(titleid), "ScePspemu");
                 break;
             }
@@ -181,6 +196,7 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
     if (ev == 1 || ev == 5 || ev == 3 || ev == 4) {
         // Load profile if app changed
         if (strncmp(g_titleid, titleid, sizeof(g_titleid))) {
+            psvs_log_printf("ksceKernelInvokeProcEventHandler_patched(ev = %d): '%s'\n", ev, titleid);
             strncpy(g_titleid, titleid, sizeof(g_titleid));
             if (g_is_in_pspemu || !psvs_profile_load()) {
                 // If no profile exists or in PspEmu,
@@ -198,6 +214,8 @@ PROCEVENT_EXIT:
 }
 
 static int psvs_thread(SceSize args, void *argp) {
+    psvs_log_printf("psvs_thread started...\n");
+
     while (g_thread_run) {
         if (g_is_in_pspemu) {
             // Don't do anything if PspEmu is running
@@ -247,14 +265,18 @@ static int psvs_thread(SceSize args, void *argp) {
         ksceKernelDelayThread(50 * 1000);
     }
 
+    psvs_log_printf("psvs_thread finished...\n");
     return 0;
 }
 
 void _start() __attribute__ ((weak, alias ("module_start")));
 int module_start(SceSize argc, const void *args) {
     int ret = 0;
-    psvs_gui_init();
     psvs_profile_init();
+    psvs_log_init();
+    psvs_log_printf("module_start(): BEGIN\n");
+
+    psvs_gui_init();
 
     tai_module_info_t tai_info;
     tai_info.size = sizeof(tai_module_info_t);
@@ -284,9 +306,7 @@ int module_start(SceSize argc, const void *args) {
     g_mutex_cpufreq_uid = ksceKernelCreateMutex("psvs_mutex_cpufreq", 0, 0, NULL);
     g_mutex_procevent_uid = ksceKernelCreateMutex("psvs_mutex_procevent", 0, 0, NULL);
 
-    snprintf(g_titleid, sizeof(g_titleid), "main");
-    if (!psvs_profile_load())
-        psvs_oc_init(); // reset all to default
+    psvs_oc_init(); // reset to default
 
     g_hooks[0] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[0],
             "SceDisplay", 0x9FED47AC, 0x16466675, ksceDisplaySetFrameBufInternal_patched);
@@ -357,13 +377,19 @@ int module_start(SceSize argc, const void *args) {
     g_injects[0] = taiInjectAbsForKernel(KERNEL_PID,
             (void *)((uintptr_t)ScePervasiveForDriver_0xE9D95643 + 0x1D), &nop, 2);
 
+    snprintf(g_titleid, sizeof(g_titleid), "main");
+    psvs_profile_load(); // load profile after hooks/patches
+
     g_thread_uid = ksceKernelCreateThread("psvs_thread", psvs_thread, 0x3C, 0x3000, 0, 0x10000, 0);
     ksceKernelStartThread(g_thread_uid, 0, NULL);
 
+    psvs_log_printf("module_start(): END: success\n");
     return SCE_KERNEL_START_SUCCESS;
 }
 
 int module_stop(SceSize argc, const void *args) {
+    psvs_log_printf("module_stop(): BEGIN\n");
+
     if (g_thread_uid >= 0) {
         g_thread_run = 0;
         ksceKernelWaitThreadEnd(g_thread_uid, NULL, NULL);
