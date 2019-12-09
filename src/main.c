@@ -284,9 +284,7 @@ int module_start(SceSize argc, const void *args) {
     g_mutex_cpufreq_uid = ksceKernelCreateMutex("psvs_mutex_cpufreq", 0, 0, NULL);
     g_mutex_procevent_uid = ksceKernelCreateMutex("psvs_mutex_procevent", 0, 0, NULL);
 
-    snprintf(g_titleid, sizeof(g_titleid), "main");
-    if (!psvs_profile_load())
-        psvs_oc_init(); // reset all to default
+    psvs_oc_init(); // reset all to default
 
     g_hooks[0] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[0],
             "SceDisplay", 0x9FED47AC, 0x16466675, ksceDisplaySetFrameBufInternal_patched);
@@ -356,6 +354,10 @@ int module_start(SceSize argc, const void *args) {
     const uint8_t nop[] = {0x00, 0xBF};
     g_injects[0] = taiInjectAbsForKernel(KERNEL_PID,
             (void *)((uintptr_t)ScePervasiveForDriver_0xE9D95643 + 0x1D), &nop, 2);
+
+    // Load main profile
+    snprintf(g_titleid, sizeof(g_titleid), "main");
+    psvs_profile_load();
 
     g_thread_uid = ksceKernelCreateThread("psvs_thread", psvs_thread, 0x3C, 0x3000, 0, 0x10000, 0);
     ksceKernelStartThread(g_thread_uid, 0, NULL);
