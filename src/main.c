@@ -105,11 +105,13 @@ int kscePowerSetArmClockFrequency_patched(int freq) {
         return ret;
 
     freq = psvs_oc_get_target_freq(PSVS_OC_DEVICE_CPU, freq);
-    ret = TAI_CONTINUE(int, g_hookrefs[9], freq);
 
     if (freq > 444 && freq <= 500) {
+        TAI_CONTINUE(int, g_hookrefs[9], 444);
         psvs_oc_holy_shit();
         ret = 0;
+    } else {
+        ret = TAI_CONTINUE(int, g_hookrefs[9], freq);
     }
 
     ksceKernelUnlockMutex(g_mutex_cpufreq_uid, 1);
