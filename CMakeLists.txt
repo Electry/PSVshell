@@ -40,6 +40,7 @@ target_link_libraries(${PROJECT_NAME}
   ScePowerForDriver_stub
   SceCtrlForDriver_stub
   SceIofilemgrForDriver_stub
+  SceSblAIMgrForDriver_stub
 )
 
 vita_create_self(${PROJECT_NAME}.skprx ${PROJECT_NAME}

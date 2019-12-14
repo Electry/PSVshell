@@ -27,14 +27,23 @@ typedef struct psvs_memory_t {
     uint32_t phycont_total;
 } psvs_memory_t;
 
+typedef struct psvs_battery_t {
+    int temp;
+    int percent;
+    int lt_hours;
+    int lt_minutes;
+    bool is_charging;
+} psvs_battery_t;
+
 void psvs_perf_calc_fps();
 void psvs_perf_poll_cpu();
 void psvs_perf_poll_memory();
+void psvs_perf_poll_batt();
 
 int psvs_perf_get_fps();
 int psvs_perf_get_load(int core);
 int psvs_perf_get_peak();
-int psvs_perf_get_temp();
+psvs_battery_t *psvs_perf_get_batt();
 psvs_memory_t *psvs_perf_get_memusage();
 
 #endif

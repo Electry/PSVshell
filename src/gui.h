@@ -3,9 +3,12 @@
 
 // scaling done internally
 #define GUI_WIDTH  308
-#define GUI_HEIGHT 308
+#define GUI_HEIGHT 344
 
 #define GUI_OSD_HEIGHT 64
+
+#define GUI_BATT_SIZE_W 32
+#define GUI_BATT_SIZE_H 16
 
 #define GUI_FONT_W 12
 #define GUI_FONT_H 24
@@ -21,6 +24,9 @@
 #define GUI_ANCHOR_CX(len) (GUI_WIDTH / 2 - ((len) * GUI_FONT_W) / 2)
 #define GUI_ANCHOR_CX2(len, scale) (GUI_WIDTH / 2 - ((len) * GUI_FONT_W * (scale)) / 2)
 #define GUI_ANCHOR_CY(lines) (GUI_HEIGHT / 2 - ((lines) * GUI_FONT_H) / 2)
+
+#define GUI_RESCALE_X(x) (int)((x) * g_gui_fb_w_ratio)
+#define GUI_RESCALE_Y(y) (int)((y) * g_gui_fb_h_ratio)
 
 typedef union {
     struct {
@@ -75,9 +81,11 @@ rgba_t psvs_gui_scale_color(int value, int min, int max);
 void psvs_gui_draw_osd_template();
 void psvs_gui_draw_osd_cpu();
 void psvs_gui_draw_osd_fps();
+void psvs_gui_draw_osd_batt();
 
 void psvs_gui_draw_template();
 void psvs_gui_draw_header();
+void psvs_gui_draw_batt_section();
 void psvs_gui_draw_cpu_section();
 void psvs_gui_draw_memory_section();
 void psvs_gui_draw_menu();

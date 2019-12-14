@@ -13,6 +13,7 @@
 int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintptr_t *addr);
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
 bool ksceAppMgrIsExclusiveProcessRunning();
+bool ksceSblAimgrIsGenuineDolce();
 
 #define PSVS_MAX_HOOKS 18
 static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
@@ -26,6 +27,7 @@ static bool   g_thread_run = true;
 
 char g_titleid[32] = "";
 bool g_is_in_pspemu = false;
+bool g_is_dolce = false;
 
 SceUID (*_ksceKernelGetProcessMainModule)(SceUID pid);
 int (*_ksceKernelGetModuleInfo)(SceUID pid, SceUID modid, SceKernelModuleInfo *info);
@@ -219,8 +221,9 @@ static int psvs_thread(SceSize args, void *argp) {
         psvs_gui_mode_t mode = psvs_gui_get_mode();
 
         // If in OSD/FULL mode, poll shown info
-        if (mode >= PSVS_GUI_MODE_OSD) {
+        if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
             psvs_perf_poll_cpu();
+            psvs_perf_poll_batt();
         }
 
         // Redraw buffer template on gui mode or fb change
@@ -236,11 +239,13 @@ static int psvs_thread(SceSize args, void *argp) {
         if (mode == PSVS_GUI_MODE_OSD) {
             psvs_gui_draw_osd_cpu();
             psvs_gui_draw_osd_fps();
+            psvs_gui_draw_osd_batt();
         }
 
         // Draw FULL mode
         if (mode == PSVS_GUI_MODE_FULL) {
             psvs_gui_draw_header();
+            psvs_gui_draw_batt_section();
             psvs_gui_draw_cpu_section();
             psvs_gui_draw_memory_section();
             psvs_gui_draw_menu();
@@ -255,6 +260,10 @@ static int psvs_thread(SceSize args, void *argp) {
 void _start() __attribute__ ((weak, alias ("module_start")));
 int module_start(SceSize argc, const void *args) {
     int ret = 0;
+
+    if (ksceSblAimgrIsGenuineDolce())
+        g_is_dolce = true;
+
     psvs_gui_init();
     psvs_profile_init();
 

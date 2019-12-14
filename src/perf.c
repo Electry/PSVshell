@@ -22,7 +22,7 @@ static SceKernelSysClock g_perf_idle_clock_last[4] = {0, 0, 0, 0};
 static SceKernelSysClock g_perf_idle_clock_q_last[4] = {0, 0, 0, 0};
 
 static psvs_memory_t g_perf_memusage = {0};
-static int g_perf_temp = 0;
+static psvs_battery_t g_perf_batt = {0};
 
 #define PSVS_PERF_FPS_SAMPLES 5
 static uint32_t g_perf_frametime_sum = 0;
@@ -44,8 +44,8 @@ int psvs_perf_get_peak() {
     return peak_total / PSVS_PERF_PEAK_SAMPLES;
 }
 
-int psvs_perf_get_temp() {
-    return g_perf_temp;
+psvs_battery_t *psvs_perf_get_batt() {
+    return &g_perf_batt;
 }
 
 psvs_memory_t *psvs_perf_get_memusage() {
@@ -109,11 +109,6 @@ void psvs_perf_poll_cpu() {
     if (g_perf_peak_usage_rotation >= PSVS_PERF_PEAK_SAMPLES)
         g_perf_peak_usage_rotation = 0; // flip
     g_perf_tick_q_last = tick_now;
-
-    // Grab batt temp
-    g_perf_temp = kscePowerGetBatteryTemp() / 100;
-    if (g_perf_temp > 99 || g_perf_temp < 0)
-        g_perf_temp = 0;
 }
 
 void psvs_perf_poll_memory() {
@@ -144,4 +139,31 @@ void psvs_perf_poll_memory() {
     } else {
         g_perf_memusage.phycont_free = g_perf_memusage.phycont_total = 0;
     }
+}
+
+void psvs_perf_poll_batt() {
+    if (g_is_dolce)
+        return;
+
+    int val;
+
+    // Grab batt percentage
+    val = kscePowerGetBatteryLifePercent();
+    if (val >= 0 && val <= 100)
+        g_perf_batt.percent = val;
+
+    // Grab batt/case temp
+    val = kscePowerGetBatteryTemp() / 100;
+    if (val >= 0 && val <= 99)
+        g_perf_batt.temp = val;
+
+    // Grab batt life time
+    val = kscePowerGetBatteryLifeTime();
+    if (val >= 0 && val < 100 * 60) {
+        g_perf_batt.lt_hours = val / 60;
+        g_perf_batt.lt_minutes = val - (g_perf_batt.lt_hours * 60);
+    }
+
+    // Grab charger
+    g_perf_batt.is_charging = kscePowerIsBatteryCharging();
 }

@@ -25,6 +25,7 @@
 
 extern char g_titleid[32];
 extern bool g_is_in_pspemu;
+extern bool g_is_dolce;
 
 extern int (*SceSysmemForKernel_0x3650963F)(uint32_t a1, SceSysmemAddressSpaceInfo *a2);
 extern int (*SceThreadmgrForDriver_0x7E280B69)(SceKernelSystemInfo *pInfo);

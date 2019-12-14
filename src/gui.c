@@ -22,6 +22,8 @@ static SceDisplayFrameBuf g_gui_fb = {
     .pitch  = 960,
 };
 static int g_gui_fb_last_width = 960;
+static float g_gui_fb_w_ratio = 1.0f;
+static float g_gui_fb_h_ratio = 1.0f;
 
 static rgba_t *g_gui_buffer;
 static SceUID g_gui_buffer_uid = -1;
@@ -42,6 +44,9 @@ static bool g_gui_mode_changed = false;
 
 #define GUI_CORNERS_XD_RADIUS 9
 static const unsigned char GUI_CORNERS_XD[GUI_CORNERS_XD_RADIUS] = {9, 7, 5, 4, 3, 2, 2, 1, 1};
+
+static const rgba_t WHITE = {.rgba = {.r = 255, .g = 255, .b = 255, .a = 255}};
+static const rgba_t BLACK = {.rgba = {.r = 0, .g = 0, .b = 0, .a = 0}};
 
 psvs_gui_mode_t psvs_gui_get_mode() {
     return g_gui_mode;
@@ -126,6 +131,9 @@ void psvs_gui_input_check(uint32_t buttons) {
 
 void psvs_gui_set_framebuf(const SceDisplayFrameBuf *pParam) {
     memcpy(&g_gui_fb, pParam, sizeof(SceDisplayFrameBuf));
+
+    g_gui_fb_w_ratio = pParam->width / 960.0f;
+    g_gui_fb_h_ratio = pParam->height / 544.0f;
 
     // Set appropriate font
     if (pParam->width <= 640) {
@@ -264,8 +272,8 @@ static void _psvs_gui_prchar(const char character, int x, int y) {
 }
 
 void psvs_gui_print(int x, int y, const char *str) {
-    x = (int)(x * (g_gui_fb.width / 960.0f));
-    y = (int)(y * (g_gui_fb.height / 544.0f));
+    x = GUI_RESCALE_X(x);
+    y = GUI_RESCALE_Y(y);
 
     size_t len = strlen(str);
     for (size_t i = 0; i < len; i++) {
@@ -319,63 +327,150 @@ rgba_t psvs_gui_scale_color(int value, int min, int max) {
     return color;
 }
 
+static void _psvs_gui_draw_battery_template(int x, int y) {
+    x = GUI_RESCALE_X(x);
+    y = GUI_RESCALE_Y(y);
+    int w = GUI_RESCALE_X(GUI_BATT_SIZE_W);
+    int h = GUI_RESCALE_Y(GUI_BATT_SIZE_H);
+
+    rgba_t *px = (rgba_t *)g_gui_buffer + (y * GUI_WIDTH) + x;
+    int xx, yy;
+
+    for (xx = 0; xx < w; xx++) {
+        // top
+        *(px + xx)
+            = *(px + GUI_WIDTH + xx) = WHITE;
+        // bottom
+        *(px + (h * GUI_WIDTH) + xx)
+            = *(px + ((h - 1) * GUI_WIDTH) + xx) = WHITE;
+    }
+
+    for (yy = 0; yy < h; yy++) {
+        // left
+        *(px + (yy * GUI_WIDTH))
+            = *(px + (yy * GUI_WIDTH) + 1) = WHITE;
+        // right
+        if (yy < h / 3 || yy > h - (h / 3)) {
+            *(px + (yy * GUI_WIDTH) + (w - 1))
+                = *(px + (yy * GUI_WIDTH) + (w - 2)) = WHITE;
+        } else {
+            *(px + (yy * GUI_WIDTH) + (w - 1) + (h / 5))
+                = *(px + (yy * GUI_WIDTH) + (w - 2) + (h / 5)) = WHITE;
+        }
+    }
+
+    // dzindzik
+    for (xx = 0; xx < (h / 5) + 2; xx++) {
+        // top
+        *(px + (GUI_WIDTH * (h / 3 - 1)) + (w - 2) + xx)
+            = *(px + (GUI_WIDTH * (h / 3)) + (w - 2) + xx) = WHITE;
+        // bottom
+        *(px + (GUI_WIDTH * (h - (h / 3))) + (w - 2) + xx)
+            = *(px + (GUI_WIDTH * (h - (h / 3) + 1)) + (w - 2) + xx) = WHITE;
+    }
+}
+
+static void _psvs_gui_draw_battery(int x, int y, int state, bool is_charging, rgba_t color) {
+    x = GUI_RESCALE_X(x);
+    y = GUI_RESCALE_Y(y);
+    int w = GUI_RESCALE_X(GUI_BATT_SIZE_W);
+    int h = GUI_RESCALE_Y(GUI_BATT_SIZE_H);
+
+    rgba_t *px = (rgba_t *)g_gui_buffer + (y * GUI_WIDTH) + x;
+    int state_x = state > 95 ? w : (state * (w - 4) / 95) + 1;
+    int xx, yy;
+
+    for (xx = 2; xx < (w - 2); xx++) {
+        for (yy = 2; yy < (h - 1); yy++) {
+            if (xx <= state_x) {
+                *(px + (GUI_WIDTH * yy) + xx) = color;
+            } else {
+                *(px + (GUI_WIDTH * yy) + xx) = BLACK;
+            }
+        }
+    }
+
+    // dzindzik
+    for (xx = 0; xx < (h / 5); xx++) {
+        for (yy = 2; yy < (h / 3) + 2; yy++) {
+            if (state > 95) {
+                *(px + (GUI_WIDTH * ((h / 3 - 1) + yy)) + w + xx - 2) = color;
+            } else {
+                *(px + (GUI_WIDTH * ((h / 3 - 1) + yy)) + w + xx - 2) = BLACK;
+            }
+        }
+    }
+
+    if (is_charging) {
+        for (xx = 0; xx < (h / 3); xx++)
+            *(px + (GUI_WIDTH * (h / 2)) + (w / 5) + xx) = WHITE;
+        for (yy = 0; yy < (h / 3); yy++)
+            *(px + (GUI_WIDTH * ((h / 3) + yy + 1)) + (w / 5) + (h / 6)) = WHITE;
+    }
+}
+
 void psvs_gui_draw_osd_template() {
     psvs_gui_set_back_color(0, 0, 0, 255);
     psvs_gui_set_text_color(255, 255, 255, 255);
     psvs_gui_clear();
 
-    // CPU / Temp
+    // CPU
     psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(8, 0), "CPU:");
     psvs_gui_printf(GUI_ANCHOR_RX(10, 16), GUI_ANCHOR_TY(8, 0), "%%    %%    %%    %%");
-    psvs_gui_printf(GUI_ANCHOR_RX(10, 6),  GUI_ANCHOR_TY(8, 1), "%%    C");
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 10), GUI_ANCHOR_TY(10, 1), "%%");
 
     // FPS
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 3), GUI_ANCHOR_TY(8, 1), "FPS");
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 3), GUI_ANCHOR_TY(10, 1), "FPS");
 
-    // Clocks
-    //psvs_gui_printf(GUI_ANCHOR_LX(10, 11),  GUI_ANCHOR_TY(8, 1), "/");
+    // Battery
+    psvs_gui_printf(GUI_ANCHOR_RX(20 + GUI_BATT_SIZE_W, 1), GUI_ANCHOR_TY(10, 1), "%%");
+    _psvs_gui_draw_battery_template(GUI_ANCHOR_RX(14 + GUI_BATT_SIZE_W, 0), GUI_ANCHOR_TY(13, 1));
 }
 
 void psvs_gui_draw_osd_cpu() {
-    int load;
+    int val;
 
     // Draw AVG load
     for (int i = 0; i < 4; i++) {
-        load = psvs_perf_get_load(i);
-        psvs_gui_set_text_color2(psvs_gui_scale_color(load, 0, 100));
-        psvs_gui_printf(GUI_ANCHOR_RX(10, 19 - i * 5), GUI_ANCHOR_TY(8, 0), "%3d", load);
+        val = psvs_perf_get_load(i);
+        psvs_gui_set_text_color2(psvs_gui_scale_color(val, 0, 100));
+        psvs_gui_printf(GUI_ANCHOR_RX(10, 19 - i * 5), GUI_ANCHOR_TY(8, 0), "%3d", val);
     }
 
     // Draw peak load
-    load = psvs_perf_get_peak();
-    psvs_gui_set_text_color2(psvs_gui_scale_color(load, 0, 100));
-    psvs_gui_printf(GUI_ANCHOR_RX(10, 9), GUI_ANCHOR_TY(8, 1), "%3d", psvs_perf_get_peak());
+    val = psvs_perf_get_peak();
+    psvs_gui_set_text_color2(psvs_gui_scale_color(val, 0, 100));
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 7), GUI_ANCHOR_TY(10, 1), "%3d", val);
 
-    // Draw temp
-    int temp = psvs_perf_get_temp();
-    psvs_gui_set_text_color2(psvs_gui_scale_color(temp, 30, 60));
-    psvs_gui_printf(GUI_ANCHOR_RX(10, 3), GUI_ANCHOR_TY(8, 1), "%2d", temp);
+    psvs_gui_set_text_color(255, 255, 255, 255);
+}
 
-    // Draw clocks
-    /*
-    int freq = kscePowerGetArmClockFrequency(), r2;
-    psvs_gui_set_text_color2(psvs_gui_scale_color(500 + 41 - freq, 41, 500));
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 8), GUI_ANCHOR_TY(8, 1), "%3d", freq);
-    kscePowerGetDeviceCount(&freq, &r2);
-    psvs_gui_set_text_color2(psvs_gui_scale_color(222 + 41 - freq, 41, 222));
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 12), GUI_ANCHOR_TY(8, 1), "%3d", freq);
-    */
+void psvs_gui_draw_osd_batt() {
+    psvs_battery_t *batt = psvs_perf_get_batt();
+
+    // Draw battery percentage
+    rgba_t color = psvs_gui_scale_color(60 - batt->percent, 0, 100);
+    psvs_gui_set_text_color2(color);
+    psvs_gui_printf(GUI_ANCHOR_RX(20 + GUI_BATT_SIZE_W, 4), GUI_ANCHOR_TY(10, 1), "%3d", batt->percent);
+
+    // Draw battery indicator
+    color.rgba.r = (int)(color.rgba.r * 0.75f);
+    color.rgba.g = (int)(color.rgba.g * 0.75f);
+    color.rgba.b = (int)(color.rgba.b * 0.75f);
+    _psvs_gui_draw_battery(GUI_ANCHOR_RX(14 + GUI_BATT_SIZE_W, 0), GUI_ANCHOR_TY(13, 1), batt->percent, batt->is_charging, color);
 
     psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
 void psvs_gui_draw_osd_fps() {
     int fps = psvs_perf_get_fps();
+
     psvs_gui_set_text_color2(psvs_gui_scale_color(30 - fps, 0, 30));
     if (fps > 99)
-        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(8, 1), "%3d", fps);
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(10, 1), "%3d", fps);
     else
-        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(8, 1), "%2d ", fps);
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(10, 1), "%2d ", fps);
+
     psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
@@ -390,16 +485,21 @@ void psvs_gui_draw_template() {
     psvs_gui_printf(GUI_ANCHOR_RX2(10, 10, 0.5f), GUI_ANCHOR_TY(8, 0), "by Electry");
     psvs_gui_set_text_scale(1.0f);
 
-    // CPU / Temp
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(32, 0), "CPU:");
-    psvs_gui_printf(GUI_ANCHOR_RX(10, 16), GUI_ANCHOR_TY(32, 0), "%%    %%    %%    %%");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(32, 1), "Peak:    %%");
-    psvs_gui_printf(GUI_ANCHOR_RX(10, 9),  GUI_ANCHOR_TY(32, 1), "Temp:   C");
+    // Batt
+    psvs_gui_printf(GUI_ANCHOR_RX(10, 9),  GUI_ANCHOR_TY(32, 0), "C");
+    psvs_gui_printf(GUI_ANCHOR_RX(14 + 6 + GUI_BATT_SIZE_W, 1), GUI_ANCHOR_TY(32, 0), "%%");
+    _psvs_gui_draw_battery_template(GUI_ANCHOR_RX(14 + GUI_BATT_SIZE_W, 0), GUI_ANCHOR_TY(35, 0));
+
+    // CPU
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(44, 1), "CPU:");
+    psvs_gui_printf(GUI_ANCHOR_RX(10, 16), GUI_ANCHOR_TY(44, 1), "%%    %%    %%    %%");
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(44, 2), "Peak:");
+    psvs_gui_printf(GUI_ANCHOR_RX(10, 1),  GUI_ANCHOR_TY(44, 2), "%%");
 
     // Memory
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(44, 2), "MEM:");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(44, 3), "VMEM:");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(44, 4), "PHY:");
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(56, 3), "MEM:");
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(56, 4), "VMEM:");
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(56, 5), "PHY:");
 
     // Menu
     psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 5), "CPU [         ]");
@@ -415,6 +515,48 @@ void psvs_gui_draw_header() {
     psvs_gui_set_text_scale(1.0f);
 }
 
+void psvs_gui_draw_batt_section() {
+    // PSTV
+    if (g_is_dolce) {
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(32, 0), "A/C");
+        return;
+    }
+
+    psvs_battery_t *batt = psvs_perf_get_batt();
+
+    // Draw temp
+    psvs_gui_set_text_color2(psvs_gui_scale_color(batt->temp, 30, 60));
+    psvs_gui_printf(GUI_ANCHOR_RX(10, 11), GUI_ANCHOR_TY(32, 0), "%2d", batt->temp);
+
+    psvs_gui_set_text_color(255, 255, 255, 255);
+
+    // Draw battery lifetime
+    if (batt->is_charging) {
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(32, 0), "Charging   ");
+    } else if (batt->lt_hours == 0 && batt->lt_minutes <= 1) {
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(32, 0), "Calibrating");
+    } else {
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(32, 0), "  %s h   m   ", batt->lt_hours >= 10 ? " " : "");
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(42, 0), "~");
+
+        psvs_gui_set_text_color2(psvs_gui_scale_color((2 * 60) - ((batt->lt_hours * 60) + batt->lt_minutes), 0, 2 * 60));
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(32, 0), "%d", batt->lt_hours);
+        psvs_gui_printf(GUI_ANCHOR_LX(10, batt->lt_hours >= 10 ? 6 : 5),  GUI_ANCHOR_TY(32, 0), "%02d", batt->lt_minutes);
+    }
+
+    // Draw battery percentage
+    rgba_t color = psvs_gui_scale_color(60 - batt->percent, 0, 100);
+    psvs_gui_set_text_color2(color);
+    psvs_gui_printf(GUI_ANCHOR_RX(20 + GUI_BATT_SIZE_W, 4), GUI_ANCHOR_TY(32, 0), "%3d", batt->percent);
+
+    // Draw battery indicator
+    color.rgba.r = (int)(color.rgba.r * 0.75f);
+    color.rgba.g = (int)(color.rgba.g * 0.75f);
+    color.rgba.b = (int)(color.rgba.b * 0.75f);
+    _psvs_gui_draw_battery(GUI_ANCHOR_RX(14 + GUI_BATT_SIZE_W, 0), GUI_ANCHOR_TY(35, 0), batt->percent, batt->is_charging, color);
+
+}
+
 void psvs_gui_draw_cpu_section() {
     int load;
 
@@ -422,47 +564,42 @@ void psvs_gui_draw_cpu_section() {
     for (int i = 0; i < 4; i++) {
         load = psvs_perf_get_load(i);
         psvs_gui_set_text_color2(psvs_gui_scale_color(load, 0, 100));
-        psvs_gui_printf(GUI_ANCHOR_RX(10, 19 - (i * 5)), GUI_ANCHOR_TY(32, 0), "%3d", load);
+        psvs_gui_printf(GUI_ANCHOR_RX(10, 19 - (i * 5)), GUI_ANCHOR_TY(44, 1), "%3d", load);
     }
 
     // Draw peak load
     load = psvs_perf_get_peak();
     psvs_gui_set_text_color2(psvs_gui_scale_color(load, 0, 100));
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 6), GUI_ANCHOR_TY(32, 1), "%3d", psvs_perf_get_peak());
-
-    // Draw temp
-    int temp = psvs_perf_get_temp();
-    psvs_gui_set_text_color2(psvs_gui_scale_color(temp, 30, 60));
-    psvs_gui_printf(GUI_ANCHOR_RX(10, 3), GUI_ANCHOR_TY(32, 1), "%2d", temp);
+    psvs_gui_printf(GUI_ANCHOR_RX(10, 4), GUI_ANCHOR_TY(44, 2), "%3d", load);
 
     psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
 static void _psvs_gui_draw_memory_usage(int line, int total, int free, int limit) {
     if (total <= 0 && free <= 0) {
-        psvs_gui_printf(GUI_ANCHOR_RX(10, 16), GUI_ANCHOR_TY(44, line), "          unused");
+        psvs_gui_printf(GUI_ANCHOR_RX(10, 16), GUI_ANCHOR_TY(56, line), "          unused");
     }
     else if (total <= limit && total > free) {
-        psvs_gui_printf(GUI_ANCHOR_RX(10, 11), GUI_ANCHOR_TY(44, line), "%-2s /     %-2s",
+        psvs_gui_printf(GUI_ANCHOR_RX(10, 11), GUI_ANCHOR_TY(56, line), "%-2s /     %-2s",
                         psvs_gui_units_from_size(total - free),
                         psvs_gui_units_from_size(total));
 
         psvs_gui_set_text_color2(psvs_gui_scale_color(total - free, total - (total / 10), total + (total / 10)));
-        psvs_gui_printf(GUI_ANCHOR_RX(10, 16), GUI_ANCHOR_TY(44, line), " %3d",
+        psvs_gui_printf(GUI_ANCHOR_RX(10, 16), GUI_ANCHOR_TY(56, line), " %3d",
                         psvs_gui_value_from_size(total - free));
-        psvs_gui_printf(GUI_ANCHOR_RX(10, 7), GUI_ANCHOR_TY(44, line), " %3d",
+        psvs_gui_printf(GUI_ANCHOR_RX(10, 7), GUI_ANCHOR_TY(56, line), " %3d",
                         psvs_gui_value_from_size(total));
 
         psvs_gui_set_text_color(255, 255, 255, 255);
     }
     else {
         psvs_gui_printf(GUI_ANCHOR_RX(10, 15 + (free >= 1024 ? 1 : 0)),
-                        GUI_ANCHOR_TY(44, line),
+                        GUI_ANCHOR_TY(56, line),
                         "         %s free",
                         psvs_gui_units_from_size(free));
         psvs_gui_set_text_color(0, 255, 0, 255);
         psvs_gui_printf(GUI_ANCHOR_RX(10, 11 + (free >= 1024 ? 1 : 0)),
-                        GUI_ANCHOR_TY(44, line),
+                        GUI_ANCHOR_TY(56, line),
                         " %3d",
                         psvs_gui_value_from_size(free));
         psvs_gui_set_text_color(255, 255, 255, 255);
@@ -472,9 +609,9 @@ static void _psvs_gui_draw_memory_usage(int line, int total, int free, int limit
 void psvs_gui_draw_memory_section() {
     psvs_memory_t *mem = psvs_perf_get_memusage();
 
-    _psvs_gui_draw_memory_usage(2, mem->main_total, mem->main_free, 512 * 1024 * 1024);
-    _psvs_gui_draw_memory_usage(3, mem->cdram_total, mem->cdram_free, 128 * 1024 * 1024);
-    _psvs_gui_draw_memory_usage(4, mem->phycont_total, mem->phycont_free, 26 * 1024 * 1024);
+    _psvs_gui_draw_memory_usage(3, mem->main_total, mem->main_free, 512 * 1024 * 1024);
+    _psvs_gui_draw_memory_usage(4, mem->cdram_total, mem->cdram_free, 128 * 1024 * 1024);
+    _psvs_gui_draw_memory_usage(5, mem->phycont_total, mem->phycont_free, 26 * 1024 * 1024);
 }
 
 static void _psvs_gui_draw_menu_item(int lines, int clock, psvs_gui_menu_control_t menuctrl) {
@@ -503,22 +640,21 @@ void psvs_gui_draw_menu() {
     _psvs_gui_draw_menu_item(2, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_XBAR), PSVS_GUI_MENUCTRL_GPU_XBAR);
 
     // Draw profile label separately
-    if (psvs_oc_has_changed()) {
+    bool has_changed = psvs_oc_has_changed();
+    if (has_changed) {
         psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "   save profile   ");
     } else {
         psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "  delete profile  ");
     }
     if (g_gui_menu_control == PSVS_GUI_MENUCTRL_PROFILE) {
         psvs_gui_set_text_color(0, 200, 255, 255);
-        psvs_gui_printf(GUI_ANCHOR_CX(psvs_oc_has_changed() ? 16 : 18), GUI_ANCHOR_BY(10, 1), ">");
-        psvs_gui_printf(GUI_ANCHOR_CX(psvs_oc_has_changed() ? 16 : 18)
-                        + GUI_ANCHOR_LX(0, psvs_oc_has_changed() ? 15 : 17),
+        psvs_gui_printf(GUI_ANCHOR_CX(has_changed ? 16 : 18), GUI_ANCHOR_BY(10, 1), ">");
+        psvs_gui_printf(GUI_ANCHOR_CX(has_changed ? 16 : 18) + GUI_ANCHOR_LX(0, has_changed ? 15 : 17),
                         GUI_ANCHOR_BY(10, 1), "<");
         psvs_gui_set_text_color(255, 255, 255, 255);
     } else {
-        psvs_gui_printf(GUI_ANCHOR_CX(psvs_oc_has_changed() ? 16 : 18), GUI_ANCHOR_BY(10, 1), " ");
-        psvs_gui_printf(GUI_ANCHOR_CX(psvs_oc_has_changed() ? 16 : 18)
-                        + GUI_ANCHOR_LX(0, psvs_oc_has_changed() ? 15 : 17),
+        psvs_gui_printf(GUI_ANCHOR_CX(has_changed ? 16 : 18), GUI_ANCHOR_BY(10, 1), " ");
+        psvs_gui_printf(GUI_ANCHOR_CX(has_changed ? 16 : 18) + GUI_ANCHOR_LX(0, has_changed ? 15 : 17),
                         GUI_ANCHOR_BY(10, 1), " ");
     }
 }
