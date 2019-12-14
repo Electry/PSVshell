@@ -9,7 +9,8 @@ SceUInt32 ksceKernelSysrootGetCurrentAddressSpaceCB();
 
 #define SECOND 1000000
 
-#define PSVS_PERF_PEAK_SAMPLES 20
+#define PSVS_PERF_CPU_SAMPLERATE 500 * 1000
+#define PSVS_PERF_PEAK_SAMPLES 10
 static int g_perf_peak_usage_samples[PSVS_PERF_PEAK_SAMPLES] = {0};
 static int g_perf_peak_usage_rotation = 0;
 static int g_perf_usage[4] = {0, 0, 0, 0};
@@ -79,7 +80,7 @@ void psvs_perf_poll_cpu() {
     SceThreadmgrForDriver_0x7E280B69(&info);
 
     // Calculate AVG CPU usage
-    if (tick_diff >= 1 * SECOND) {
+    if (tick_diff >= PSVS_PERF_CPU_SAMPLERATE) {
         for (int i = 0; i < 4; i++) {
             g_perf_usage[i] = (int)(100.0f - ((info.cpuInfo[i].idleClock - g_perf_idle_clock_last[i]) / (float)tick_diff) * 100);
             if (g_perf_usage[i] < 0)
