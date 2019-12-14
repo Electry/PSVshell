@@ -92,10 +92,11 @@ void psvs_gui_input_check(uint32_t buttons) {
         // Profile label
         if (g_gui_menu_control == PSVS_GUI_MENUCTRL_PROFILE) {
             if (buttons_new & SCE_CTRL_CROSS) {
-                if (psvs_oc_has_changed()) {
-                    psvs_profile_save();
+                bool global = buttons & GUI_GLOBAL_PROFILE_BUTTON_MOD;
+                if ((!global && psvs_oc_has_changed()) || !psvs_profile_exists(global)) {
+                    psvs_profile_save(global);
                 } else {
-                    psvs_profile_delete();
+                    psvs_profile_delete(global);
                 }
             }
         }
@@ -640,21 +641,29 @@ void psvs_gui_draw_menu() {
     _psvs_gui_draw_menu_item(2, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_XBAR), PSVS_GUI_MENUCTRL_GPU_XBAR);
 
     // Draw profile label separately
-    bool has_changed = psvs_oc_has_changed();
-    if (has_changed) {
-        psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "   save profile   ");
+    bool show_global = g_gui_input_buttons & GUI_GLOBAL_PROFILE_BUTTON_MOD;
+    bool save = (!show_global && psvs_oc_has_changed()) || !psvs_profile_exists(show_global);
+
+    if (save) {
+        if (show_global)
+            psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "   save default   ");
+        else
+            psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "   save profile   ");
     } else {
-        psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "  delete profile  ");
+        if (show_global)
+            psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "  delete default  ");
+        else
+            psvs_gui_printf(GUI_ANCHOR_CX(18), GUI_ANCHOR_BY(10, 1), "  delete profile  ");
     }
     if (g_gui_menu_control == PSVS_GUI_MENUCTRL_PROFILE) {
         psvs_gui_set_text_color(0, 200, 255, 255);
-        psvs_gui_printf(GUI_ANCHOR_CX(has_changed ? 16 : 18), GUI_ANCHOR_BY(10, 1), ">");
-        psvs_gui_printf(GUI_ANCHOR_CX(has_changed ? 16 : 18) + GUI_ANCHOR_LX(0, has_changed ? 15 : 17),
+        psvs_gui_printf(GUI_ANCHOR_CX(save ? 16 : 18), GUI_ANCHOR_BY(10, 1), ">");
+        psvs_gui_printf(GUI_ANCHOR_CX(save ? 16 : 18) + GUI_ANCHOR_LX(0, save ? 15 : 17),
                         GUI_ANCHOR_BY(10, 1), "<");
         psvs_gui_set_text_color(255, 255, 255, 255);
     } else {
-        psvs_gui_printf(GUI_ANCHOR_CX(has_changed ? 16 : 18), GUI_ANCHOR_BY(10, 1), " ");
-        psvs_gui_printf(GUI_ANCHOR_CX(has_changed ? 16 : 18) + GUI_ANCHOR_LX(0, has_changed ? 15 : 17),
+        psvs_gui_printf(GUI_ANCHOR_CX(save ? 16 : 18), GUI_ANCHOR_BY(10, 1), " ");
+        psvs_gui_printf(GUI_ANCHOR_CX(save ? 16 : 18) + GUI_ANCHOR_LX(0, save ? 15 : 17),
                         GUI_ANCHOR_BY(10, 1), " ");
     }
 }

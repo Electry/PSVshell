@@ -3,7 +3,8 @@
 
 void psvs_profile_init();
 bool psvs_profile_load();
-bool psvs_profile_save();
-bool psvs_profile_delete();
+bool psvs_profile_save(bool global);
+bool psvs_profile_delete(bool global);
+bool psvs_profile_exists(bool global);
 
 #endif

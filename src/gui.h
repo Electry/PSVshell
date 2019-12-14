@@ -28,6 +28,8 @@
 #define GUI_RESCALE_X(x) (int)((x) * g_gui_fb_w_ratio)
 #define GUI_RESCALE_Y(y) (int)((y) * g_gui_fb_h_ratio)
 
+#define GUI_GLOBAL_PROFILE_BUTTON_MOD SCE_CTRL_LTRIGGER
+
 typedef union {
     struct {
         uint8_t r;
