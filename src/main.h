@@ -23,6 +23,9 @@
         return freq; \
     }
 
+#define INVALID_PID -1
+
+extern SceUID g_pid;
 extern char g_titleid[32];
 extern bool g_is_in_pspemu;
 extern bool g_is_dolce;
@@ -33,6 +36,7 @@ extern int (*ScePervasiveForDriver_0xE9D95643)(int mul, int ndiv);
 
 extern uint32_t *ScePower_41C8;
 extern uint32_t *ScePower_41CC;
+extern uint32_t *ScePower_0;
 
 extern int (*_kscePowerGetArmClockFrequency)();
 extern int (*_kscePowerGetBusClockFrequency)();

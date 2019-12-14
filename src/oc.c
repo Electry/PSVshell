@@ -26,22 +26,22 @@ PSVS_OC_DECL_SETTER(_kscePowerSetGpuXbarClockFrequency);
 
 static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
     [PSVS_OC_DEVICE_CPU] = {
-        .freq_n = 8, .freq = {41, 83, 111, 166, 222, 333, 444, 500},
+        .freq_n = 8, .freq = {41, 83, 111, 166, 222, 333, 444, 500}, .default_freq = 333,
         .get_freq = __kscePowerGetArmClockFrequency,
         .set_freq = __kscePowerSetArmClockFrequency
     },
     [PSVS_OC_DEVICE_GPU_ES4] = {
-        .freq_n = 6, .freq = {41, 55, 83, 111, 166, 222},
+        .freq_n = 6, .freq = {41, 55, 83, 111, 166, 222}, .default_freq = 111,
         .get_freq = __kscePowerGetGpuEs4ClockFrequency,
         .set_freq = __kscePowerSetGpuEs4ClockFrequency
     },
     [PSVS_OC_DEVICE_BUS] = {
-        .freq_n = 5, .freq = {55, 83, 111, 166, 222},
+        .freq_n = 5, .freq = {55, 83, 111, 166, 222}, .default_freq = 222,
         .get_freq = __kscePowerGetBusClockFrequency,
         .set_freq = __kscePowerSetBusClockFrequency
     },
     [PSVS_OC_DEVICE_GPU_XBAR] = {
-        .freq_n = 3, .freq = {83, 111, 166},
+        .freq_n = 3, .freq = {83, 111, 166}, .default_freq = 111,
         .get_freq = __kscePowerGetGpuXbarClockFrequency,
         .set_freq = __kscePowerSetGpuXbarClockFrequency
     },
@@ -77,6 +77,15 @@ int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq) {
     return default_freq;
 }
 
+void psvs_oc_set_target_freq(psvs_oc_device_t device) {
+    // Refresh manual clocks
+    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
+        psvs_oc_set_freq(device, g_oc.manual_freq[device]);
+    // Restore default clocks
+    else if (g_oc.mode[device] == PSVS_OC_MODE_DEFAULT)
+        psvs_oc_set_freq(device, psvs_oc_get_default_freq(device));
+}
+
 psvs_oc_mode_t psvs_oc_get_mode(psvs_oc_device_t device) {
     return g_oc.mode[device];
 }
@@ -84,10 +93,7 @@ psvs_oc_mode_t psvs_oc_get_mode(psvs_oc_device_t device) {
 void psvs_oc_set_mode(psvs_oc_device_t device, psvs_oc_mode_t mode) {
     g_oc.mode[device] = mode;
     g_oc_has_changed = true;
-
-    // Refresh manual clocks
-    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
-        psvs_oc_set_freq(device, g_oc.manual_freq[device]);
+    psvs_oc_set_target_freq(device);
 }
 
 psvs_oc_profile_t *psvs_oc_get_profile() {
@@ -98,11 +104,8 @@ void psvs_oc_set_profile(psvs_oc_profile_t *oc) {
     memcpy(&g_oc, oc, sizeof(psvs_oc_profile_t));
     g_oc_has_changed = false;
 
-    // Refresh manual clocks
-    for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++) {
-        if (g_oc.mode[i] == PSVS_OC_MODE_MANUAL)
-            psvs_oc_set_freq(i, g_oc.manual_freq[i]);
-    }
+    for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++)
+        psvs_oc_set_target_freq(i);
 }
 
 bool psvs_oc_has_changed() {
@@ -111,6 +114,37 @@ bool psvs_oc_has_changed() {
 
 void psvs_oc_set_changed(bool changed) {
     g_oc_has_changed = changed;
+}
+
+int psvs_oc_get_default_freq(psvs_oc_device_t device) {
+    int freq = g_oc_devopt[device].default_freq;
+
+    if (g_pid == INVALID_PID)
+        return freq;
+
+    uintptr_t pstorage = 0;
+    int ret = ksceKernelGetProcessLocalStorageAddrForPid(g_pid, *ScePower_0, (void **)&pstorage, 0);
+    if (ret < 0 || pstorage == 0)
+        return freq;
+
+    switch (device) {
+        case PSVS_OC_DEVICE_BUS: freq = *(uint32_t *)(pstorage + 40); break;
+        default:
+        case PSVS_OC_DEVICE_CPU: freq = *(uint32_t *)(pstorage + 44); break;
+        case PSVS_OC_DEVICE_GPU_XBAR: freq = *(uint32_t *)(pstorage + 48); break;
+        case PSVS_OC_DEVICE_GPU_ES4: freq = *(uint32_t *)(pstorage + 52); break;
+    }
+
+    // Validate
+    bool valid = false;
+    for (int i = 0; i < g_oc_devopt[device].freq_n; i++) {
+        if (freq == g_oc_devopt[device].freq[i]) {
+            valid = true;
+            break;
+        }
+    }
+
+    return valid ? freq : g_oc_devopt[device].default_freq;
 }
 
 void psvs_oc_reset_manual(psvs_oc_device_t device) {

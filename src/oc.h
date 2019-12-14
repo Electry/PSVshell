@@ -31,6 +31,7 @@ typedef struct {
 typedef struct {
     const int freq[PSVS_OC_MAX_FREQ_N];
     const int freq_n;
+    const int default_freq;
     int (*get_freq)();
     int (*set_freq)(int freq);
 } psvs_oc_devopt_t;
@@ -40,6 +41,7 @@ int psvs_oc_set_freq(psvs_oc_device_t device, int freq);
 void psvs_oc_holy_shit();
 
 int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq);
+void psvs_oc_set_target_freq(psvs_oc_device_t device);
 psvs_oc_mode_t psvs_oc_get_mode(psvs_oc_device_t device);
 void psvs_oc_set_mode(psvs_oc_device_t device, psvs_oc_mode_t mode);
 
@@ -48,6 +50,9 @@ psvs_oc_profile_t *psvs_oc_get_profile();
 void psvs_oc_set_profile(psvs_oc_profile_t *oc);
 bool psvs_oc_has_changed();
 void psvs_oc_set_changed(bool changed);
+
+// default freq
+int psvs_oc_get_default_freq(psvs_oc_device_t device);
 
 // manual freq adjust
 void psvs_oc_reset_manual(psvs_oc_device_t device);

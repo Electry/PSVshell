@@ -25,6 +25,7 @@ static SceUID g_mutex_procevent_uid = -1;
 static SceUID g_thread_uid = -1;
 static bool   g_thread_run = true;
 
+SceUID g_pid = INVALID_PID;
 char g_titleid[32] = "";
 bool g_is_in_pspemu = false;
 bool g_is_dolce = false;
@@ -38,6 +39,7 @@ int (*ScePervasiveForDriver_0xE9D95643)(int mul, int ndiv);
 
 uint32_t *ScePower_41C8 = NULL;
 uint32_t *ScePower_41CC = NULL;
+uint32_t *ScePower_0    = NULL;
 
 int (*_kscePowerGetArmClockFrequency)();
 int (*_kscePowerGetBusClockFrequency)();
@@ -183,9 +185,13 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
     }
 
     if (ev == 1 || ev == 5 || ev == 3 || ev == 4) {
-        // Load profile if app changed
         if (strncmp(g_titleid, titleid, sizeof(g_titleid))) {
             strncpy(g_titleid, titleid, sizeof(g_titleid));
+
+            // Set current pid
+            g_pid = (ev == 1 || ev == 5) ? pid : INVALID_PID;
+
+            // Load profile if app changed
             if (g_is_in_pspemu || !psvs_profile_load()) {
                 // If no profile exists or in PspEmu,
                 // reset all options to default
@@ -273,6 +279,7 @@ int module_start(SceSize argc, const void *args) {
 
     module_get_offset(KERNEL_PID, tai_info.modid, 1, 0x41C8, (uintptr_t *)&ScePower_41C8);
     module_get_offset(KERNEL_PID, tai_info.modid, 1, 0x41CC, (uintptr_t *)&ScePower_41CC);
+    module_get_offset(KERNEL_PID, tai_info.modid, 1, 0x0,    (uintptr_t *)&ScePower_0);
 
     module_get_export_func(KERNEL_PID,
             "ScePower", 0x1590166F, 0xABC6F88F, (uintptr_t *)&_kscePowerGetArmClockFrequency);
@@ -295,7 +302,7 @@ int module_start(SceSize argc, const void *args) {
     g_mutex_cpufreq_uid = ksceKernelCreateMutex("psvs_mutex_cpufreq", 0, 0, NULL);
     g_mutex_procevent_uid = ksceKernelCreateMutex("psvs_mutex_procevent", 0, 0, NULL);
 
-    psvs_oc_init(); // reset all to default
+    psvs_oc_init(); // reset profile options to default
 
     g_hooks[0] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[0],
             "SceDisplay", 0x9FED47AC, 0x16466675, ksceDisplaySetFrameBufInternal_patched);
