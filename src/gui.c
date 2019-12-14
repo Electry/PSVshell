@@ -42,11 +42,15 @@ static psvs_gui_menu_control_t g_gui_menu_control = PSVS_GUI_MENUCTRL_CPU;
 static psvs_gui_mode_t g_gui_mode = PSVS_GUI_MODE_HIDDEN;
 static bool g_gui_mode_changed = false;
 
+static bool g_gui_lazydraw_batt = false;
+static bool g_gui_lazydraw_memusage = false;
+
 #define GUI_CORNERS_XD_RADIUS 9
 static const unsigned char GUI_CORNERS_XD[GUI_CORNERS_XD_RADIUS] = {9, 7, 5, 4, 3, 2, 2, 1, 1};
 
 static const rgba_t WHITE = {.rgba = {.r = 255, .g = 255, .b = 255, .a = 255}};
 static const rgba_t BLACK = {.rgba = {.r = 0, .g = 0, .b = 0, .a = 0}};
+static const rgba_t FPS_COLOR = {.rgba = {.r = 0, .g = 255, .b = 0, .a = 255}};
 
 psvs_gui_mode_t psvs_gui_get_mode() {
     return g_gui_mode;
@@ -157,12 +161,22 @@ void psvs_gui_set_framebuf(const SceDisplayFrameBuf *pParam) {
 
 bool psvs_gui_fb_res_changed() {
     bool changed = g_gui_fb_last_width != g_gui_fb.width;
+    if (changed) {
+        g_gui_lazydraw_batt = true;
+        g_gui_lazydraw_memusage = true;
+    }
+
     g_gui_fb_last_width = g_gui_fb.width;
     return changed;
 }
 
 bool psvs_gui_mode_changed() {
     bool changed = g_gui_mode_changed;
+    if (changed) {
+        g_gui_lazydraw_batt = true;
+        g_gui_lazydraw_memusage = true;
+    }
+
     g_gui_mode_changed = false;
     return changed;
 }
@@ -190,8 +204,6 @@ void psvs_gui_set_text_scale(float scale) {
 }
 
 static void _psvs_gui_dd_prchar(const char character, int x, int y) {
-    rgba_t color = {.rgba = {0, 255, 0, 255}};
-
     for (int yy = 0; yy < g_gui_font_height * g_gui_font_scale; yy++) {
         int yy_font = yy / g_gui_font_scale;
 
@@ -212,7 +224,7 @@ static void _psvs_gui_dd_prchar(const char character, int x, int y) {
             uint8_t charByte = g_gui_font[charPosH + (xx_font / 8)];
 
             if ((charByte >> (7 - (xx_font % 8))) & 1) {
-                ksceKernelMemcpyKernelToUser((uintptr_t)(px + xx), &color, sizeof(rgba_t));
+                ksceKernelMemcpyKernelToUser((uintptr_t)(px + xx), &FPS_COLOR, sizeof(rgba_t));
             }
         }
     }
@@ -448,6 +460,11 @@ void psvs_gui_draw_osd_cpu() {
 
 void psvs_gui_draw_osd_batt() {
     psvs_battery_t *batt = psvs_perf_get_batt();
+    if (!batt->_has_changed && !g_gui_lazydraw_batt)
+        return;
+
+    batt->_has_changed = false;
+    g_gui_lazydraw_batt = false;
 
     // Draw battery percentage
     rgba_t color = psvs_gui_scale_color(60 - batt->percent, 0, 100);
@@ -524,6 +541,11 @@ void psvs_gui_draw_batt_section() {
     }
 
     psvs_battery_t *batt = psvs_perf_get_batt();
+    if (!batt->_has_changed && !g_gui_lazydraw_batt)
+        return;
+
+    batt->_has_changed = false;
+    g_gui_lazydraw_batt = false;
 
     // Draw temp
     psvs_gui_set_text_color2(psvs_gui_scale_color(batt->temp, 30, 60));
@@ -609,6 +631,11 @@ static void _psvs_gui_draw_memory_usage(int line, int total, int free, int limit
 
 void psvs_gui_draw_memory_section() {
     psvs_memory_t *mem = psvs_perf_get_memusage();
+    if (!mem->_has_changed && !g_gui_lazydraw_memusage)
+        return;
+
+    mem->_has_changed = false;
+    g_gui_lazydraw_memusage = false;
 
     _psvs_gui_draw_memory_usage(3, mem->main_total, mem->main_free, 512 * 1024 * 1024);
     _psvs_gui_draw_memory_usage(4, mem->cdram_total, mem->cdram_free, 128 * 1024 * 1024);

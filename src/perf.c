@@ -119,26 +119,29 @@ void psvs_perf_poll_memory() {
 
     if (*(uint32_t *)(sysroot_cas + 328) > 0) {
         SceSysmemForKernel_0x3650963F(*(uint32_t *)(sysroot_cas + 328), &info);
-        g_perf_memusage.main_free = info.free;
-        g_perf_memusage.main_total = info.total;
+        PSVS_CHECK_ASSIGN(g_perf_memusage, main_free, info.free);
+        PSVS_CHECK_ASSIGN(g_perf_memusage, main_total, info.total);
     } else {
-        g_perf_memusage.main_free = g_perf_memusage.main_total = 0;
+        PSVS_CHECK_ASSIGN(g_perf_memusage, main_free, 0);
+        PSVS_CHECK_ASSIGN(g_perf_memusage, main_total, 0);
     }
 
     if (*(uint32_t *)(sysroot_cas + 332) > 0) {
         SceSysmemForKernel_0x3650963F(*(uint32_t *)(sysroot_cas + 332), &info);
-        g_perf_memusage.cdram_free = info.free;
-        g_perf_memusage.cdram_total = info.total;
+        PSVS_CHECK_ASSIGN(g_perf_memusage, cdram_free, info.free);
+        PSVS_CHECK_ASSIGN(g_perf_memusage, cdram_total, info.total);
     } else {
-        g_perf_memusage.cdram_free = g_perf_memusage.cdram_total = 0;
+        PSVS_CHECK_ASSIGN(g_perf_memusage, cdram_free, 0);
+        PSVS_CHECK_ASSIGN(g_perf_memusage, cdram_total, 0);
     }
 
     if (*(uint32_t *)(sysroot_cas + 316) > 0) {
         SceSysmemForKernel_0x3650963F(*(uint32_t *)(sysroot_cas + 316), &info);
-        g_perf_memusage.phycont_free = info.free;
-        g_perf_memusage.phycont_total = info.total;
+        PSVS_CHECK_ASSIGN(g_perf_memusage, phycont_free, info.free);
+        PSVS_CHECK_ASSIGN(g_perf_memusage, phycont_total, info.total);
     } else {
-        g_perf_memusage.phycont_free = g_perf_memusage.phycont_total = 0;
+        PSVS_CHECK_ASSIGN(g_perf_memusage, phycont_free, 0);
+        PSVS_CHECK_ASSIGN(g_perf_memusage, phycont_total, 0);
     }
 }
 
@@ -150,21 +153,24 @@ void psvs_perf_poll_batt() {
 
     // Grab batt percentage
     val = kscePowerGetBatteryLifePercent();
-    if (val >= 0 && val <= 100)
-        g_perf_batt.percent = val;
+    if (val >= 0 && val <= 100) {
+        PSVS_CHECK_ASSIGN(g_perf_batt, percent, val);
+    }
 
     // Grab batt/case temp
     val = kscePowerGetBatteryTemp() / 100;
-    if (val >= 0 && val <= 99)
-        g_perf_batt.temp = val;
+    if (val >= 0 && val <= 99) {
+        PSVS_CHECK_ASSIGN(g_perf_batt, temp, val);
+    }
 
     // Grab batt life time
     val = kscePowerGetBatteryLifeTime();
     if (val >= 0 && val < 100 * 60) {
-        g_perf_batt.lt_hours = val / 60;
-        g_perf_batt.lt_minutes = val - (g_perf_batt.lt_hours * 60);
+        PSVS_CHECK_ASSIGN(g_perf_batt, lt_hours, val / 60);
+        PSVS_CHECK_ASSIGN(g_perf_batt, lt_minutes, val - (g_perf_batt.lt_hours * 60));
     }
 
     // Grab charger
-    g_perf_batt.is_charging = kscePowerIsBatteryCharging();
+    bool bval = kscePowerIsBatteryCharging();
+    PSVS_CHECK_ASSIGN(g_perf_batt, is_charging, bval);
 }

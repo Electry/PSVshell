@@ -1,6 +1,10 @@
 #ifndef _PERF_H_
 #define _PERF_H_
 
+#define PSVS_CHECK_ASSIGN(struct, field, new_value) \
+    if (struct.field != (new_value)) struct._has_changed = true; \
+    struct.field = (new_value)
+
 typedef struct SceKernelSystemInfo {
     SceSize   size;
     SceUInt32 activeCpuMask;
@@ -25,6 +29,7 @@ typedef struct psvs_memory_t {
     uint32_t cdram_total;
     uint32_t phycont_free;
     uint32_t phycont_total;
+    bool _has_changed;
 } psvs_memory_t;
 
 typedef struct psvs_battery_t {
@@ -33,6 +38,7 @@ typedef struct psvs_battery_t {
     int lt_hours;
     int lt_minutes;
     bool is_charging;
+    bool _has_changed;
 } psvs_battery_t;
 
 void psvs_perf_calc_fps();
