@@ -62,7 +62,7 @@ static void psvs_input_check(SceCtrlData *pad_data, int count) {
 }
 
 int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplayFrameBuf *pParam, int sync) {
-    if (!head || !pParam)
+    if (head != ksceDisplayGetPrimaryHead() || !pParam)
         goto DISPLAY_HOOK_RET;
 
     if (g_is_in_pspemu)
