@@ -25,9 +25,19 @@
 
 #define INVALID_PID -1
 
+typedef enum {
+    PSVS_APP_SCESHELL,
+    PSVS_APP_SYSTEM,
+    PSVS_APP_SYSTEM_XCL,
+    PSVS_APP_PSPEMU,
+    PSVS_APP_GAME, // or homebrew
+    PSVS_APP_MAX
+} psvs_app_t;
+
 extern SceUID g_pid;
+extern psvs_app_t g_app;
 extern char g_titleid[32];
-extern bool g_is_in_pspemu;
+
 extern bool g_is_dolce;
 
 extern int (*SceSysmemForKernel_0x3650963F)(uint32_t a1, SceSysmemAddressSpaceInfo *a2);

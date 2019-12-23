@@ -14,6 +14,8 @@ int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintp
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
 bool ksceAppMgrIsExclusiveProcessRunning();
 bool ksceSblAimgrIsGenuineDolce();
+bool ksceSblACMgrIsPspEmu(SceUID pid);
+bool ksceSblACMgrIsSceShell(SceUID pid);
 
 #define PSVS_MAX_HOOKS 18
 static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
@@ -26,12 +28,10 @@ static SceUID g_thread_uid = -1;
 static bool   g_thread_run = true;
 
 SceUID g_pid = INVALID_PID;
+psvs_app_t g_app = PSVS_APP_SCESHELL;
 char g_titleid[32] = "";
-bool g_is_in_pspemu = false;
-bool g_is_dolce = false;
 
-SceUID (*_ksceKernelGetProcessMainModule)(SceUID pid);
-int (*_ksceKernelGetModuleInfo)(SceUID pid, SceUID modid, SceKernelModuleInfo *info);
+bool g_is_dolce = false;
 
 int (*SceSysmemForKernel_0x3650963F)(uint32_t a1, SceSysmemAddressSpaceInfo *a2);
 int (*SceThreadmgrForDriver_0x7E280B69)(SceKernelSystemInfo *pInfo);
@@ -62,13 +62,13 @@ static void psvs_input_check(SceCtrlData *pad_data, int count) {
 }
 
 int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplayFrameBuf *pParam, int sync) {
-    if (head != ksceDisplayGetPrimaryHead() || !pParam)
+    if (head != ksceDisplayGetPrimaryHead() || !pParam || !pParam->base)
         goto DISPLAY_HOOK_RET;
 
-    if (g_is_in_pspemu)
+    if (g_app == PSVS_APP_PSPEMU)
         goto DISPLAY_HOOK_RET;
 
-    if (index && ksceAppMgrIsExclusiveProcessRunning())
+    if (index && (ksceAppMgrIsExclusiveProcessRunning() || g_app == PSVS_APP_GAME || g_app == PSVS_APP_SYSTEM_XCL))
         goto DISPLAY_HOOK_RET; // Do not draw over SceShell overlay
 
     psvs_gui_mode_t mode = psvs_gui_get_mode();
@@ -141,8 +141,37 @@ DECL_FUNC_HOOK_PATCH_FREQ_GETTER(15, scePowerGetBusClockFrequency,     PSVS_OC_D
 DECL_FUNC_HOOK_PATCH_FREQ_GETTER(16, scePowerGetGpuClockFrequency,     PSVS_OC_DEVICE_GPU_ES4)
 DECL_FUNC_HOOK_PATCH_FREQ_GETTER(17, scePowerGetGpuXbarClockFrequency, PSVS_OC_DEVICE_GPU_XBAR)
 
+static psvs_app_t _psvs_get_app_type(int pid, const char *titleid) {
+    psvs_app_t app = PSVS_APP_MAX;
+
+    if (ksceSblACMgrIsPspEmu(pid)) {
+        app = PSVS_APP_PSPEMU;
+    } else if (!strncmp(titleid, "NPXS", 4)) {
+        app = PSVS_APP_SYSTEM;
+
+        // TODO: Figure out a way to do this on the fly
+
+        if (!strncmp(&titleid[4], "10079", 5)) { // Daily Checker BG
+            app = PSVS_APP_MAX; // blacklist
+        } else if (!strncmp(&titleid[4], "10007", 5) || // Welcome Park
+                   !strncmp(&titleid[4], "10010", 5) || // Videos
+                   !strncmp(&titleid[4], "10026", 5) || // Content Manager
+                   !strncmp(&titleid[4], "10095", 5)) { // Panoramic Camera
+            app = PSVS_APP_SYSTEM_XCL; // exclusive
+        }
+    } else if (ksceSblACMgrIsSceShell(pid) && !strncmp(titleid, "main", 4)) {
+        app = PSVS_APP_SCESHELL;
+    } else {
+        app = PSVS_APP_GAME;
+    }
+
+    return app;
+}
+
 int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, int *a5, int a6) {
     char titleid[sizeof(g_titleid)];
+    psvs_app_t app = PSVS_APP_SCESHELL;
+
     int ret = ksceKernelLockMutex(g_mutex_procevent_uid, 1, NULL);
     if (ret < 0)
         goto PROCEVENT_EXIT;
@@ -150,49 +179,43 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
     switch (ev) {
         case 1: // startup
         case 5: // resume
-            // Ignore startup events if exclusive proc is already running
-            if (ksceAppMgrIsExclusiveProcessRunning()
-                    && strncmp(g_titleid, "main", 4) != 0)
+            // Ignore startup events if non-SceShell app is running
+            if (g_app != PSVS_APP_SCESHELL)
                 goto PROCEVENT_UNLOCK_EXIT;
-
-            // Check if pid is PspEmu
-            SceKernelModuleInfo info;
-            info.size = sizeof(SceKernelModuleInfo);
-            _ksceKernelGetModuleInfo(pid, _ksceKernelGetProcessMainModule(pid), &info);
-            if (!strncmp(info.module_name, "ScePspemu", 9)) {
-                g_is_in_pspemu = true;
-                snprintf(titleid, sizeof(titleid), "ScePspemu");
-                break;
-            }
 
             // Check titleid
             ksceKernelGetProcessTitleId(pid, titleid, sizeof(titleid));
-            if (!strncmp(titleid, "NPXS", 4))
+
+            // Check app type
+            app = _psvs_get_app_type(pid, titleid);
+            if (app == PSVS_APP_MAX)
                 goto PROCEVENT_UNLOCK_EXIT;
 
             break;
 
         case 3: // exit
         case 4: // suspend
-            // Check titleid
-            ksceKernelGetProcessTitleId(pid, titleid, sizeof(titleid));
-            if (!strncmp(titleid, "NPXS", 4))
+            if (g_pid != pid)
                 goto PROCEVENT_UNLOCK_EXIT;
 
-            g_is_in_pspemu = false;
+            app = PSVS_APP_SCESHELL;
             snprintf(titleid, sizeof(titleid), "main");
             break;
     }
 
     if (ev == 1 || ev == 5 || ev == 3 || ev == 4) {
         if (strncmp(g_titleid, titleid, sizeof(g_titleid))) {
+            // Set titleid
             strncpy(g_titleid, titleid, sizeof(g_titleid));
 
-            // Set current pid
+            // Set pid
             g_pid = (ev == 1 || ev == 5) ? pid : INVALID_PID;
 
-            // Load profile if app changed
-            if (g_is_in_pspemu || !psvs_profile_load()) {
+            // Set type
+            g_app = app;
+
+            // Load profile
+            if (g_app == PSVS_APP_PSPEMU || !psvs_profile_load()) {
                 // If no profile exists or in PspEmu,
                 // reset all options to default
                 psvs_oc_init();
@@ -209,7 +232,7 @@ PROCEVENT_EXIT:
 
 static int psvs_thread(SceSize args, void *argp) {
     while (g_thread_run) {
-        if (g_is_in_pspemu) {
+        if (g_app == PSVS_APP_PSPEMU) {
             // Don't do anything if PspEmu is running
             ksceKernelDelayThread(200 * 1000);
             continue;
@@ -344,19 +367,6 @@ int module_start(SceSize argc, const void *args) {
             "ScePower", 0x1082DA7F, 0x1B04A1D6, scePowerGetGpuClockFrequency_patched);
     g_hooks[17] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[17],
             "ScePower", 0x1082DA7F, 0x0A750DEE, scePowerGetGpuXbarClockFrequency_patched);
-
-    ret = module_get_export_func(KERNEL_PID,
-            "SceKernelModulemgr", 0xC445FA63, 0x20A27FA9, (uintptr_t *)&_ksceKernelGetProcessMainModule); // 3.60
-    if (ret < 0) {
-        module_get_export_func(KERNEL_PID,
-            "SceKernelModulemgr", 0x92C9FFC2, 0x679F5144, (uintptr_t *)&_ksceKernelGetProcessMainModule); // 3.65
-    }
-    ret = module_get_export_func(KERNEL_PID,
-            "SceKernelModulemgr", 0xC445FA63, 0xD269F915, (uintptr_t *)&_ksceKernelGetModuleInfo); // 3.60
-    if (ret < 0) {
-        module_get_export_func(KERNEL_PID,
-            "SceKernelModulemgr", 0x92C9FFC2, 0xDAA90093, (uintptr_t *)&_ksceKernelGetModuleInfo); // 3.65
-    }
 
     ret = module_get_export_func(KERNEL_PID,
             "SceSysmem", 0x63A519E5, 0x3650963F, (uintptr_t *)&SceSysmemForKernel_0x3650963F); // 3.60
