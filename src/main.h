@@ -32,6 +32,8 @@
 
 #define INVALID_PID -1
 
+#define PSVS_FRAMEBUF_HOOK_MAGIC 0x7183015
+
 typedef enum {
     PSVS_APP_SCESHELL,
     PSVS_APP_SYSTEM,

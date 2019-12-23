@@ -62,6 +62,11 @@ static void psvs_input_check(SceCtrlData *pad_data, int count) {
 }
 
 int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplayFrameBuf *pParam, int sync) {
+    if (sync == PSVS_FRAMEBUF_HOOK_MAGIC) {
+        sync = 1;
+        goto DISPLAY_HOOK_RET;
+    }
+
     if (head != ksceDisplayGetPrimaryHead() || !pParam || !pParam->base)
         goto DISPLAY_HOOK_RET;
 
@@ -76,11 +81,11 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
         goto DISPLAY_HOOK_RET;
 
     psvs_perf_calc_fps();
-    psvs_gui_set_framebuf(pParam);
 
-    if (mode == PSVS_GUI_MODE_FULL) {
+    if (mode == PSVS_GUI_MODE_FULL)
         psvs_perf_poll_memory();
-    }
+
+    psvs_gui_set_framebuf(pParam);
 
     if (mode == PSVS_GUI_MODE_FPS || mode == PSVS_GUI_MODE_FULL) {
         psvs_gui_dd_fps(); // draw fps onto fb
@@ -88,6 +93,13 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
 
     if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
         psvs_gui_cpy(); // cpy from buffer
+
+        if (sync && mode == PSVS_GUI_MODE_FULL && g_app != PSVS_APP_SCESHELL && g_app != PSVS_APP_SYSTEM) {
+            // update now to fix flicker when vblank period is missed
+            int ret = TAI_CONTINUE(int, g_hookrefs[0], head, index, pParam, 0);
+            ret = ksceDisplaySetFrameBufInternal(head, index, pParam, PSVS_FRAMEBUF_HOOK_MAGIC);
+            return ret;
+        }
     }
 
 DISPLAY_HOOK_RET:
@@ -272,7 +284,7 @@ static int psvs_thread(SceSize args, void *argp) {
         }
 
         // Draw FULL mode
-        if (mode == PSVS_GUI_MODE_FULL) {
+        else if (mode == PSVS_GUI_MODE_FULL) {
             psvs_gui_draw_header();
             psvs_gui_draw_batt_section();
             psvs_gui_draw_cpu_section();
