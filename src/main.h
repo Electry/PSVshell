@@ -23,6 +23,13 @@
         return freq; \
     }
 
+#define DACR_UNRESTRICT(state) \
+    asm volatile ("mrc p15, 0, %0, c3, c0, 0\n\t" \
+                  "mcr p15, 0, %1, c3, c0, 0" : "=&r" (state) : "r" (0xffffffff));
+
+#define DACR_RESET(state) \
+    asm volatile ("mcr p15, 0, %0, c3, c0, 0" : : "r" (state));
+
 #define INVALID_PID -1
 
 typedef enum {
