@@ -38,8 +38,8 @@ typedef enum {
     PSVS_APP_SCESHELL,
     PSVS_APP_SYSTEM,
     PSVS_APP_SYSTEM_XCL,
-    PSVS_APP_PSPEMU,
     PSVS_APP_GAME, // or homebrew
+    PSVS_APP_BLACKLIST, // pspemu
     PSVS_APP_MAX
 } psvs_app_t;
 

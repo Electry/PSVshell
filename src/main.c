@@ -70,7 +70,7 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
     if (head != ksceDisplayGetPrimaryHead() || !pParam || !pParam->base)
         goto DISPLAY_HOOK_RET;
 
-    if (g_app == PSVS_APP_PSPEMU)
+    if (g_app == PSVS_APP_BLACKLIST)
         goto DISPLAY_HOOK_RET;
 
     if (index && (ksceAppMgrIsExclusiveProcessRunning() || g_app == PSVS_APP_GAME || g_app == PSVS_APP_SYSTEM_XCL))
@@ -157,19 +157,23 @@ static psvs_app_t _psvs_get_app_type(int pid, const char *titleid) {
     psvs_app_t app = PSVS_APP_MAX;
 
     if (ksceSblACMgrIsPspEmu(pid)) {
-        app = PSVS_APP_PSPEMU;
+        app = PSVS_APP_BLACKLIST;
     } else if (!strncmp(titleid, "NPXS", 4)) {
         app = PSVS_APP_SYSTEM;
 
         // TODO: Figure out a way to do this on the fly
 
-        if (!strncmp(&titleid[4], "10079", 5)) { // Daily Checker BG
+        if (!strncmp(&titleid[4], "10079", 5) ||     // Daily Checker BG
+                !strncmp(&titleid[4], "10063", 5)) { // MsgMW
             app = PSVS_APP_MAX; // blacklist
         } else if (!strncmp(&titleid[4], "10007", 5) || // Welcome Park
                    !strncmp(&titleid[4], "10010", 5) || // Videos
                    !strncmp(&titleid[4], "10026", 5) || // Content Manager
                    !strncmp(&titleid[4], "10095", 5)) { // Panoramic Camera
-            app = PSVS_APP_SYSTEM_XCL; // exclusive
+            if (g_is_dolce)
+                app = PSVS_APP_BLACKLIST; // blacklist xcl apps on PSTV
+            else
+                app = PSVS_APP_SYSTEM_XCL; // exclusive
         }
     } else if (ksceSblACMgrIsSceShell(pid) && !strncmp(titleid, "main", 4)) {
         app = PSVS_APP_SCESHELL;
@@ -227,8 +231,8 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
             g_app = app;
 
             // Load profile
-            if (g_app == PSVS_APP_PSPEMU || !psvs_profile_load()) {
-                // If no profile exists or in PspEmu,
+            if (g_app == PSVS_APP_BLACKLIST || !psvs_profile_load()) {
+                // If no profile exists or in blacklisted app,
                 // reset all options to default
                 psvs_oc_init();
             }
@@ -244,8 +248,8 @@ PROCEVENT_EXIT:
 
 static int psvs_thread(SceSize args, void *argp) {
     while (g_thread_run) {
-        if (g_app == PSVS_APP_PSPEMU) {
-            // Don't do anything if PspEmu is running
+        if (g_app == PSVS_APP_BLACKLIST) {
+            // Don't do anything if blacklisted app is running
             ksceKernelDelayThread(200 * 1000);
             continue;
         }
