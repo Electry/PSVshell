@@ -53,7 +53,7 @@ int (*_kscePowerSetGpuXbarClockFrequency)(int freq);
 
 static void psvs_input_check(SceCtrlData *pad_data, int count) {
     // Do not pass input to fg app
-    if (psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
+    if (g_app != PSVS_APP_BLACKLIST && psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
         SceCtrlData kctrl;
         kctrl.buttons = 0;
         for (int i = 0; i < count; i++)
@@ -72,6 +72,9 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
 
     if (g_app == PSVS_APP_BLACKLIST)
         goto DISPLAY_HOOK_RET;
+
+    if (!index && g_app == PSVS_APP_SCESHELL)
+        goto DISPLAY_HOOK_RET; // Do not draw on i0 in SceShell
 
     if (index && (ksceAppMgrIsExclusiveProcessRunning() || g_app == PSVS_APP_GAME || g_app == PSVS_APP_SYSTEM_XCL))
         goto DISPLAY_HOOK_RET; // Do not draw over SceShell overlay
@@ -165,7 +168,7 @@ static psvs_app_t _psvs_get_app_type(int pid, const char *titleid) {
 
         if (!strncmp(&titleid[4], "10079", 5) ||     // Daily Checker BG
                 !strncmp(&titleid[4], "10063", 5)) { // MsgMW
-            app = PSVS_APP_MAX; // blacklist
+            app = PSVS_APP_MAX; // not an app
         } else if (!strncmp(&titleid[4], "10007", 5) || // Welcome Park
                    !strncmp(&titleid[4], "10010", 5) || // Videos
                    !strncmp(&titleid[4], "10026", 5) || // Content Manager
@@ -204,7 +207,7 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
 
             // Check app type
             app = _psvs_get_app_type(pid, titleid);
-            if (app == PSVS_APP_MAX)
+            if (app == PSVS_APP_MAX) // not an app
                 goto PROCEVENT_UNLOCK_EXIT;
 
             break;
