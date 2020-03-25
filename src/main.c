@@ -24,6 +24,7 @@ static SceUID         g_injects[1];
 
 static SceUID g_mutex_cpufreq_uid = -1;
 static SceUID g_mutex_procevent_uid = -1;
+static SceUID g_mutex_framebuf_uid = -1;
 static SceUID g_thread_uid = -1;
 static bool   g_thread_run = true;
 
@@ -83,6 +84,10 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
     if (mode == PSVS_GUI_MODE_HIDDEN)
         goto DISPLAY_HOOK_RET;
 
+    int ret = ksceKernelLockMutex(g_mutex_framebuf_uid, 1, NULL);
+    if (ret < 0)
+        goto DISPLAY_HOOK_RET;
+
     psvs_perf_calc_fps();
 
     if (mode == PSVS_GUI_MODE_FULL)
@@ -99,11 +104,15 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
 
         if (sync && mode == PSVS_GUI_MODE_FULL && g_app != PSVS_APP_SCESHELL && g_app != PSVS_APP_SYSTEM) {
             // update now to fix flicker when vblank period is missed
+            ksceKernelUnlockMutex(g_mutex_framebuf_uid, 1);
+
             int ret = TAI_CONTINUE(int, g_hookrefs[0], head, index, pParam, 0);
             ret = ksceDisplaySetFrameBufInternal(head, index, pParam, PSVS_FRAMEBUF_HOOK_MAGIC);
             return ret;
         }
     }
+
+    ksceKernelUnlockMutex(g_mutex_framebuf_uid, 1);
 
 DISPLAY_HOOK_RET:
     return TAI_CONTINUE(int, g_hookrefs[0], head, index, pParam, sync);
@@ -343,6 +352,7 @@ int module_start(SceSize argc, const void *args) {
 
     g_mutex_cpufreq_uid = ksceKernelCreateMutex("psvs_mutex_cpufreq", 0, 0, NULL);
     g_mutex_procevent_uid = ksceKernelCreateMutex("psvs_mutex_procevent", 0, 0, NULL);
+    g_mutex_framebuf_uid = ksceKernelCreateMutex("psvs_mutex_framebuf", 0, 0, NULL);
 
     psvs_oc_init(); // reset profile options to default
 
@@ -431,6 +441,8 @@ int module_stop(SceSize argc, const void *args) {
         ksceKernelDeleteMutex(g_mutex_cpufreq_uid);
     if (g_mutex_procevent_uid >= 0)
         ksceKernelDeleteMutex(g_mutex_procevent_uid);
+    if (g_mutex_framebuf_uid >= 0)
+        ksceKernelDeleteMutex(g_mutex_framebuf_uid);
 
     psvs_gui_deinit();
 
