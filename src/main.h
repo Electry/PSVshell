@@ -2,7 +2,7 @@
 #define _MAIN_H_
 #include "perf.h"
 
-#define PSVS_VERSION_STRING "PSVshell v1.1"
+#define PSVS_VERSION_STRING "PSVshell v1.2 beta"
 #define PSVS_VERSION_VER    "PSVS0100"
 
 #define DECL_FUNC_HOOK_PATCH_CTRL(index, name) \
