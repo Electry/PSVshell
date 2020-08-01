@@ -182,10 +182,7 @@ static psvs_app_t _psvs_get_app_type(int pid, const char *titleid) {
                    !strncmp(&titleid[4], "10010", 5) || // Videos
                    !strncmp(&titleid[4], "10026", 5) || // Content Manager
                    !strncmp(&titleid[4], "10095", 5)) { // Panoramic Camera
-            if (g_is_dolce)
-                app = PSVS_APP_BLACKLIST; // blacklist xcl apps on PSTV
-            else
-                app = PSVS_APP_SYSTEM_XCL; // exclusive
+            app = PSVS_APP_SYSTEM_XCL; // exclusive
         }
     } else if (ksceSblACMgrIsSceShell(pid) && !strncmp(titleid, "main", 4)) {
         app = PSVS_APP_SCESHELL;
