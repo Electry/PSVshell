@@ -152,7 +152,7 @@ void psvs_gui_set_framebuf(const SceDisplayFrameBuf *pParam) {
         g_gui_font_width = 9; // <- trim last col, better scaling
         g_gui_font_height = 18;
     } else {
-        // 960x544 - Terminus 12x24 Bold
+        // 960x544 or more - Terminus 12x24 Bold
         g_gui_font = FONT_TER_U24B;
         g_gui_font_width = 12;
         g_gui_font_height = 24;
@@ -730,7 +730,9 @@ void psvs_gui_cpy() {
 
     for (int line = 0; line < h; line++) {
         int xd = 0;
-        int xd_line = line * (544.0f / g_gui_fb.height);
+        int xd_line = line;
+        if (g_gui_fb.height < 544.0f)
+            xd_line = xd_line * (544.0f / g_gui_fb.height);
 
         // Top corners
         if (xd_line < GUI_CORNERS_XD_RADIUS) {
