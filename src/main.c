@@ -82,11 +82,11 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
         psvs_perf_poll_memory();
     }
 
-    if (mode == PSVS_GUI_MODE_FPS || mode == PSVS_GUI_MODE_FULL) {
+    if (mode == PSVS_GUI_MODE_FPS || mode == PSVS_GUI_MODE_FPS_OLED || mode == PSVS_GUI_MODE_FULL) {
         psvs_gui_dd_fps(); // draw fps onto fb
     }
 
-    if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
+    if (mode == PSVS_GUI_MODE_OSD ||mode == PSVS_GUI_MODE_OSD_OLED || mode == PSVS_GUI_MODE_FULL) {
         psvs_gui_cpy(); // cpy from buffer
     }
 
@@ -227,14 +227,14 @@ static int psvs_thread(SceSize args, void *argp) {
         psvs_gui_mode_t mode = psvs_gui_get_mode();
 
         // If in OSD/FULL mode, poll shown info
-        if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
+        if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_OSD_OLED || mode == PSVS_GUI_MODE_FULL) {
             psvs_perf_poll_cpu();
             psvs_perf_poll_batt();
         }
 
         // Redraw buffer template on gui mode or fb change
         if (fb_or_mode_changed) {
-            if (mode == PSVS_GUI_MODE_OSD) {
+            if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_OSD_OLED) {
                 psvs_gui_draw_osd_template();
             } else if (mode == PSVS_GUI_MODE_FULL) {
                 psvs_gui_draw_template();
@@ -242,7 +242,7 @@ static int psvs_thread(SceSize args, void *argp) {
         }
 
         // Draw OSD mode
-        if (mode == PSVS_GUI_MODE_OSD) {
+        if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_OSD_OLED) {
             psvs_gui_draw_osd_cpu();
             psvs_gui_draw_osd_fps();
             psvs_gui_draw_osd_batt();

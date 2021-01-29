@@ -22,6 +22,10 @@ static SceDisplayFrameBuf g_gui_fb = {
     .pitch  = 960,
 };
 static int g_gui_fb_last_width = 960;
+static short osd_move_dir = 1;
+static float osd_move_counter = 0;
+static short fps_move_dir = 1;
+static float fps_move_counter = 0;
 static float g_gui_fb_w_ratio = 1.0f;
 static float g_gui_fb_h_ratio = 1.0f;
 
@@ -51,6 +55,7 @@ static const unsigned char GUI_CORNERS_XD[GUI_CORNERS_XD_RADIUS] = {9, 7, 5, 4, 
 static const rgba_t WHITE = {.rgba = {.r = 255, .g = 255, .b = 255, .a = 255}};
 static const rgba_t BLACK = {.rgba = {.r = 0, .g = 0, .b = 0, .a = 0}};
 static const rgba_t FPS_COLOR = {.rgba = {.r = 0, .g = 255, .b = 0, .a = 255}};
+static const rgba_t FPS_COLOR_OLED = { .rgba = {.r = 0, .g = 204, .b = 68, .a = 255} };
 
 psvs_gui_mode_t psvs_gui_get_mode() {
     return g_gui_mode;
@@ -224,7 +229,9 @@ static void _psvs_gui_dd_prchar(const char character, int x, int y) {
             uint8_t charByte = g_gui_font[charPosH + (xx_font / 8)];
 
             if ((charByte >> (7 - (xx_font % 8))) & 1) {
-                ksceKernelMemcpyKernelToUser((uintptr_t)(px + xx), &FPS_COLOR, sizeof(rgba_t));
+                ksceKernelMemcpyKernelToUser((uintptr_t)(px + xx),
+                    g_gui_mode == PSVS_GUI_MODE_FPS_OLED ? &FPS_COLOR_OLED : &FPS_COLOR,
+                    sizeof(rgba_t));
             }
         }
     }
@@ -235,8 +242,27 @@ void psvs_gui_dd_fps() {
     snprintf(buf, 4, "%d", psvs_perf_get_fps());
     size_t len = strlen(buf);
 
+    float shift = 0;
+    if (g_gui_mode == PSVS_GUI_MODE_FPS_OLED) {
+        shift = fps_move_counter;
+    }
+
     for (int i = 0; i < len; i++) {
-        _psvs_gui_dd_prchar(buf[i], 10 + i * g_gui_font_width * g_gui_font_scale, 10);
+        _psvs_gui_dd_prchar(buf[i], shift + i * g_gui_font_width * g_gui_font_scale, 10);
+    }
+    if (g_gui_mode == PSVS_GUI_MODE_FPS_OLED)
+    {
+        fps_move_counter += (float)fps_move_dir / 300;
+        if (fps_move_counter > g_gui_fb.width - 30)
+        {
+            fps_move_counter -= 3;
+            fps_move_dir = -1;
+        }
+        else if (fps_move_counter < 0)
+        {
+            fps_move_counter += 3;
+            fps_move_dir = 1;
+        }
     }
 }
 
@@ -424,7 +450,12 @@ static void _psvs_gui_draw_battery(int x, int y, int state, bool is_charging, rg
 
 void psvs_gui_draw_osd_template() {
     psvs_gui_set_back_color(0, 0, 0, 255);
-    psvs_gui_set_text_color(255, 255, 255, 255);
+    if (g_gui_mode == PSVS_GUI_MODE_OSD) {
+        psvs_gui_set_text_color(255, 255, 255, 255);
+    }
+    else {
+        psvs_gui_set_text_color(0, 255, 0, 255);
+    }
     psvs_gui_clear();
 
     // CPU
@@ -713,12 +744,32 @@ void psvs_gui_deinit() {
 }
 
 void psvs_gui_cpy() {
-    int height = (g_gui_mode == PSVS_GUI_MODE_OSD) ? GUI_OSD_HEIGHT : GUI_HEIGHT;
-
+    int height = (g_gui_mode == PSVS_GUI_MODE_OSD || g_gui_mode == PSVS_GUI_MODE_OSD_OLED) ? GUI_OSD_HEIGHT : GUI_HEIGHT;
+ 
     int w = (int)(GUI_WIDTH * (g_gui_fb.width / 960.0f));
     int h = (int)(height * (g_gui_fb.height / 544.0f));
-    int x = (g_gui_mode == PSVS_GUI_MODE_OSD) ? 10 : (g_gui_fb.width / 2) - (w / 2);
-    int y = (g_gui_mode == PSVS_GUI_MODE_OSD) ? 10 : (g_gui_fb.height / 2) - (h / 2);
+    int x = 0;
+    if (g_gui_mode == PSVS_GUI_MODE_OSD) {
+        x = 0;
+    }
+    else if (g_gui_mode == PSVS_GUI_MODE_OSD_OLED) {
+        osd_move_counter += (float)osd_move_dir / 300;
+        if (osd_move_counter > g_gui_fb.width - w)
+        {
+            osd_move_counter -= 3;
+            osd_move_dir = -1;
+        }
+        else if (osd_move_counter < 0)
+        {
+            osd_move_counter += 3;
+            osd_move_dir = 1;
+        }
+        x = osd_move_counter;
+    }
+    else {
+        x = (g_gui_fb.width / 2) - (w / 2);
+    }
+    int y = (g_gui_mode == PSVS_GUI_MODE_OSD || g_gui_mode == PSVS_GUI_MODE_OSD_OLED) ? 10 : (g_gui_fb.height / 2) - (h / 2);
 
     for (int line = 0; line < h; line++) {
         int xd = 0;

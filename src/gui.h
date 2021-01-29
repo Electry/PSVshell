@@ -44,7 +44,9 @@ typedef enum {
     PSVS_GUI_MODE_HIDDEN,
     PSVS_GUI_MODE_FULL,
     PSVS_GUI_MODE_FPS,
+    PSVS_GUI_MODE_FPS_OLED,
     PSVS_GUI_MODE_OSD,
+    PSVS_GUI_MODE_OSD_OLED,
     PSVS_GUI_MODE_MAX
 } psvs_gui_mode_t;
 
