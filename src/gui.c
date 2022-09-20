@@ -120,12 +120,16 @@ void psvs_gui_input_check(uint32_t buttons) {
                 else if (buttons_new & SCE_CTRL_CROSS) {
                     psvs_oc_set_mode(device, PSVS_OC_MODE_DEFAULT);
                 }
+                // Enable auto freq for CPU
+                else if (device == PSVS_OC_DEVICE_CPU && buttons_new & SCE_CTRL_CIRCLE) {
+                    psvs_oc_set_mode(device, PSVS_OC_MODE_AUTO);
+                }
             }
             // In default freq mode
             else {
                 if (buttons_new & SCE_CTRL_CROSS) {
                     psvs_oc_reset_manual(device);
-                    psvs_oc_set_mode(device, PSVS_OC_MODE_MANUAL);
+                    psvs_oc_set_mode(device, PSVS_OC_MODE_MANUAL);                  
                 }
             }
         }
@@ -430,7 +434,8 @@ void psvs_gui_draw_osd_template() {
     // CPU
     psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(8, 0), "CPU:");
     psvs_gui_printf(GUI_ANCHOR_RX(10, 16), GUI_ANCHOR_TY(8, 0), "%%    %%    %%    %%");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 10), GUI_ANCHOR_TY(10, 1), "%%");
+    //psvs_gui_printf(GUI_ANCHOR_LX(10, 10), GUI_ANCHOR_TY(10, 1), "%%");
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 10), GUI_ANCHOR_TY(10, 1), "MHz");
 
     // FPS
     psvs_gui_printf(GUI_ANCHOR_LX(10, 3), GUI_ANCHOR_TY(10, 1), "FPS");
@@ -451,8 +456,10 @@ void psvs_gui_draw_osd_cpu() {
     }
 
     // Draw peak load
-    val = psvs_perf_get_peak();
-    psvs_gui_set_text_color2(psvs_gui_scale_color(val, 0, 100));
+    //val = psvs_perf_get_peak();
+    val = psvs_oc_get_freq(PSVS_OC_DEVICE_CPU);
+    //psvs_gui_set_text_color2(psvs_gui_scale_color(val, 0, 100));
+    psvs_gui_set_text_color2(psvs_gui_scale_color(val, 41, 500));
     psvs_gui_printf(GUI_ANCHOR_LX(10, 7), GUI_ANCHOR_TY(10, 1), "%3d", val);
 
     psvs_gui_set_text_color(255, 255, 255, 255);
@@ -653,9 +660,13 @@ static void _psvs_gui_draw_menu_item(int lines, int clock, psvs_gui_menu_control
         psvs_gui_printf(GUI_ANCHOR_CX(19) + GUI_ANCHOR_LX(0, 18), GUI_ANCHOR_BY(10, lines), " ");
     }
 
-    // Highlight freq if in manual mode
+    // Highlight freq if in manual mode (blue)
     if (psvs_oc_get_mode(_psvs_gui_get_device_from_menuctrl(menuctrl)) == PSVS_OC_MODE_MANUAL) {
         psvs_gui_set_text_color(0, 200, 255, 255);
+    }
+    // Highlight freq if in auto mode (red)
+    if (psvs_oc_get_mode(_psvs_gui_get_device_from_menuctrl(menuctrl)) == PSVS_OC_MODE_AUTO) {
+        psvs_gui_set_text_color(255, 0, 0, 255);
     }
     psvs_gui_printf(GUI_ANCHOR_CX(15) + GUI_ANCHOR_LX(0, 6),  GUI_ANCHOR_BY(10, lines), "%3d MHz", clock);
     psvs_gui_set_text_color(255, 255, 255, 255);

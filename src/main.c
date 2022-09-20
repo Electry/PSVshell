@@ -13,7 +13,7 @@
 int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintptr_t *addr);
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
 bool ksceAppMgrIsExclusiveProcessRunning();
-bool ksceSblAimgrIsGenuineDolce();
+//bool ksceSblAimgrIsGenuineDolce();
 
 #define PSVS_MAX_HOOKS 18
 static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
@@ -208,6 +208,7 @@ PROCEVENT_EXIT:
 }
 
 static int psvs_thread(SceSize args, void *argp) {
+    int counter = 0;
     while (g_thread_run) {
         if (g_is_in_pspemu) {
             // Don't do anything if PspEmu is running
@@ -230,6 +231,21 @@ static int psvs_thread(SceSize args, void *argp) {
         if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
             psvs_perf_poll_cpu();
             psvs_perf_poll_batt();
+        }
+        
+        // Compute dynamic cpu freq if auto mode is selected
+        if (psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) == PSVS_OC_MODE_AUTO) {
+            if (psvs_oc_check_raise_freq(PSVS_OC_DEVICE_CPU)) {
+                psvs_oc_change_manual(PSVS_OC_DEVICE_CPU, true);
+                counter = 0;
+            }
+            if (psvs_oc_check_lower_freq(PSVS_OC_DEVICE_CPU) && counter >= 10) {
+                psvs_oc_change_manual(PSVS_OC_DEVICE_CPU, false);
+                counter = 0;
+            }
+            // Add time space between freq shift when lowering freq
+            if (counter < 10)
+                counter++;
         }
 
         // Redraw buffer template on gui mode or fb change

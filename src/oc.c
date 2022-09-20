@@ -164,12 +164,58 @@ void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq) {
         }
     }
 
+    // Don't allow going bellow 111MHz in AUTO mode
+    if (target_freq < 111 && g_oc.mode[device] == PSVS_OC_MODE_AUTO) 
+        target_freq = 111;
+
     g_oc.manual_freq[device] = target_freq;
     g_oc_has_changed = true;
 
     // Refresh manual clocks
-    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
+    //if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
+    if (g_oc.mode[device] != PSVS_OC_MODE_DEFAULT)
         psvs_oc_set_freq(device, g_oc.manual_freq[device]);
+}
+
+bool psvs_oc_check_raise_freq(psvs_oc_device_t device) {
+    if(device != PSVS_OC_DEVICE_CPU)
+        return false;
+
+    int freq = g_oc_devopt[device].get_freq();
+    int peak = psvs_perf_get_peak();
+    int avg = (psvs_perf_get_load(0) + psvs_perf_get_load(1) + psvs_perf_get_load(2)) / 3;
+
+    if(freq == 111 && peak >= 60)
+        return true;
+    if(freq < 222 && peak >= 70)
+        return true;
+    if(freq == 222 && peak >= 75)
+        return true;
+    if(freq == 333 && (peak >= 80 || avg >= 50))
+        return true;
+    if(freq == 444 && (peak >=85 || avg >= 60))
+        return true;
+    
+    return false;
+}
+
+bool psvs_oc_check_lower_freq(psvs_oc_device_t device) {
+    if(device != PSVS_OC_DEVICE_CPU)
+        return false;
+
+    int freq = g_oc_devopt[device].get_freq();
+    int peak = psvs_perf_get_peak();
+
+    if(freq == 500 && peak < 70)
+        return true;
+    if(freq > 500 && peak < 65)
+        return true;
+    if(freq > 222 && peak < 55)
+        return true;
+    if(freq > 166 && peak < 50)
+        return true;
+
+    return false;
 }
 
 void psvs_oc_init() {

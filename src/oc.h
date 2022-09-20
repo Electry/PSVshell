@@ -19,6 +19,7 @@ typedef enum {
 typedef enum {
     PSVS_OC_MODE_DEFAULT,
     PSVS_OC_MODE_MANUAL,
+    PSVS_OC_MODE_AUTO,
     PSVS_OC_MODE_MAX
 } psvs_oc_mode_t;
 
@@ -57,6 +58,10 @@ int psvs_oc_get_default_freq(psvs_oc_device_t device);
 // manual freq adjust
 void psvs_oc_reset_manual(psvs_oc_device_t device);
 void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq);
+
+// auto (cpu) freq adjust
+bool psvs_oc_check_raise_freq(psvs_oc_device_t device);
+bool psvs_oc_check_lower_freq(psvs_oc_device_t device);
 
 void psvs_oc_init();
 
