@@ -236,11 +236,11 @@ static int psvs_thread(SceSize args, void *argp) {
         // Compute dynamic cpu freq if auto mode is selected
         if (psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) == PSVS_OC_MODE_AUTO) {
             if (psvs_oc_check_raise_freq(PSVS_OC_DEVICE_CPU)) {
-                psvs_oc_change_manual(PSVS_OC_DEVICE_CPU, true);
+                psvs_oc_change(PSVS_OC_DEVICE_CPU, true);
                 counter = 0;
             }
             if (psvs_oc_check_lower_freq(PSVS_OC_DEVICE_CPU) && counter >= 10) {
-                psvs_oc_change_manual(PSVS_OC_DEVICE_CPU, false);
+                psvs_oc_change(PSVS_OC_DEVICE_CPU, false);
                 counter = 0;
             }
             // Add time space between freq shift when lowering freq

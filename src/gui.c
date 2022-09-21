@@ -112,9 +112,9 @@ void psvs_gui_input_check(uint32_t buttons) {
             if (psvs_oc_get_mode(device) == PSVS_OC_MODE_MANUAL) {
                 // Move L/R
                 if (buttons_new & SCE_CTRL_RIGHT) {
-                    psvs_oc_change_manual(device, true);
+                    psvs_oc_change(device, true);
                 } else if (buttons_new & SCE_CTRL_LEFT) {
-                    psvs_oc_change_manual(device, false);
+                    psvs_oc_change(device, false);
                 }
                 // Back to default
                 else if (buttons_new & SCE_CTRL_CROSS) {
@@ -125,11 +125,28 @@ void psvs_gui_input_check(uint32_t buttons) {
                     psvs_oc_set_mode(device, PSVS_OC_MODE_AUTO);
                 }
             }
+            // In auto freq mode
+            else if (psvs_oc_get_mode(device) == PSVS_OC_MODE_AUTO) {
+                // Move L/R
+                if (buttons_new & SCE_CTRL_RIGHT) {
+                    psvs_oc_change_max_freq(device, true);
+                } else if (buttons_new & SCE_CTRL_LEFT) {
+                    psvs_oc_change_max_freq(device, false);
+                }
+                // Back to default
+                else if (buttons_new & SCE_CTRL_CROSS) {
+                    psvs_oc_set_mode(device, PSVS_OC_MODE_DEFAULT);
+                }
+            }
             // In default freq mode
             else {
                 if (buttons_new & SCE_CTRL_CROSS) {
-                    psvs_oc_reset_manual(device);
+                    psvs_oc_reset(device);
                     psvs_oc_set_mode(device, PSVS_OC_MODE_MANUAL);                  
+                }
+                if (buttons_new & SCE_CTRL_CIRCLE && device == PSVS_OC_DEVICE_CPU) {
+                    psvs_oc_reset(device);
+                    psvs_oc_set_mode(device, PSVS_OC_MODE_AUTO);                  
                 }
             }
         }
@@ -673,7 +690,7 @@ static void _psvs_gui_draw_menu_item(int lines, int clock, psvs_gui_menu_control
 }
 
 void psvs_gui_draw_menu() {
-    _psvs_gui_draw_menu_item(5, psvs_oc_get_freq(PSVS_OC_DEVICE_CPU), PSVS_GUI_MENUCTRL_CPU);
+    _psvs_gui_draw_menu_item(5, psvs_oc_get_max_freq(PSVS_OC_DEVICE_CPU), PSVS_GUI_MENUCTRL_CPU);
     _psvs_gui_draw_menu_item(4, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_ES4), PSVS_GUI_MENUCTRL_GPU_ES4);
     _psvs_gui_draw_menu_item(3, psvs_oc_get_freq(PSVS_OC_DEVICE_BUS), PSVS_GUI_MENUCTRL_BUS);
     _psvs_gui_draw_menu_item(2, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_XBAR), PSVS_GUI_MENUCTRL_GPU_XBAR);

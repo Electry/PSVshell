@@ -50,7 +50,8 @@ static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
 static psvs_oc_profile_t g_oc = {
     .ver = PSVS_VERSION_VER,
     .mode = {0},
-    .manual_freq = {0}
+    .target_freq = {0},
+    .max_freq = {0}
 };
 static bool g_oc_has_changed = true;
 
@@ -72,15 +73,24 @@ void psvs_oc_holy_shit() {
 }
 
 int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq) {
-    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
-        return g_oc.manual_freq[device];
+    if (g_oc.mode[device] != PSVS_OC_MODE_DEFAULT)
+        return g_oc.target_freq[device];
     return default_freq;
+}
+
+int psvs_oc_get_max_freq(psvs_oc_device_t device) {
+    if (g_oc.mode[device] != PSVS_OC_MODE_DEFAULT)
+        return g_oc.max_freq[device];
+    return g_oc_devopt[device].default_freq;
 }
 
 void psvs_oc_set_target_freq(psvs_oc_device_t device) {
     // Refresh manual clocks
     if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
-        psvs_oc_set_freq(device, g_oc.manual_freq[device]);
+        psvs_oc_set_freq(device, g_oc.max_freq[device]);
+    // Refresh auto clocks
+    else if (g_oc.mode[device] == PSVS_OC_MODE_AUTO)
+        psvs_oc_set_freq(device, g_oc.target_freq[device]);
     // Restore default clocks
     else if (g_oc.mode[device] == PSVS_OC_MODE_DEFAULT)
         psvs_oc_set_freq(device, psvs_oc_get_default_freq(device));
@@ -147,13 +157,14 @@ int psvs_oc_get_default_freq(psvs_oc_device_t device) {
     return valid ? freq : g_oc_devopt[device].default_freq;
 }
 
-void psvs_oc_reset_manual(psvs_oc_device_t device) {
-    g_oc.manual_freq[device] = psvs_oc_get_freq(device);
+void psvs_oc_reset(psvs_oc_device_t device) {
+    g_oc.max_freq[device] = psvs_oc_get_freq(device);
+    g_oc.target_freq[device] = psvs_oc_get_freq(device);
     g_oc_has_changed = true;
 }
 
-void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq) {
-    int target_freq = g_oc.manual_freq[device]; // current manual freq
+void psvs_oc_change(psvs_oc_device_t device, bool raise_freq) {
+    int target_freq = g_oc.target_freq[device]; // current freq
 
     for (int i = 0; i < g_oc_devopt[device].freq_n; i++) {
         int ii = raise_freq ? i : g_oc_devopt[device].freq_n - i - 1;
@@ -164,17 +175,23 @@ void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq) {
         }
     }
 
-    // Don't allow going bellow 111MHz in AUTO mode
-    if (target_freq < 111 && g_oc.mode[device] == PSVS_OC_MODE_AUTO) 
-        target_freq = 111;
-
-    g_oc.manual_freq[device] = target_freq;
-    g_oc_has_changed = true;
+    // Keep clocks inside the limits (111MHz to max_freq) in AUTO mode
+    if (g_oc.mode[device] == PSVS_OC_MODE_AUTO) {
+        if (target_freq < PSVS_OC_CPU_MIN_FREQ)
+            target_freq = PSVS_OC_CPU_MIN_FREQ;
+        if (target_freq > g_oc.max_freq[device])
+            target_freq = g_oc.max_freq[device];
+    }
+    // In manual mode, max_freq and target_freq are the same
+    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL) {
+        g_oc.max_freq[device] = target_freq;
+        g_oc_has_changed = true;
+    }
+    g_oc.target_freq[device] = target_freq;
 
     // Refresh manual clocks
-    //if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
     if (g_oc.mode[device] != PSVS_OC_MODE_DEFAULT)
-        psvs_oc_set_freq(device, g_oc.manual_freq[device]);
+        psvs_oc_set_freq(device, g_oc.max_freq[device]);
 }
 
 bool psvs_oc_check_raise_freq(psvs_oc_device_t device) {
@@ -185,11 +202,9 @@ bool psvs_oc_check_raise_freq(psvs_oc_device_t device) {
     int peak = psvs_perf_get_peak();
     int avg = (psvs_perf_get_load(0) + psvs_perf_get_load(1) + psvs_perf_get_load(2)) / 3;
 
-    if(freq == 111 && peak >= 60)
+    if(freq <= 111 && peak >= 50)
         return true;
-    if(freq < 222 && peak >= 70)
-        return true;
-    if(freq == 222 && peak >= 75)
+    if(freq <= 222 && peak >= 60)
         return true;
     if(freq == 333 && (peak >= 80 || avg >= 50))
         return true;
@@ -206,22 +221,44 @@ bool psvs_oc_check_lower_freq(psvs_oc_device_t device) {
     int freq = g_oc_devopt[device].get_freq();
     int peak = psvs_perf_get_peak();
 
-    if(freq == 500 && peak < 70)
+    if (freq == 500 && peak < 75)
         return true;
-    if(freq > 500 && peak < 65)
+    if (freq < 500 && peak < 70)
         return true;
-    if(freq > 222 && peak < 55)
+    if (freq < 333 && peak < 60)
         return true;
-    if(freq > 166 && peak < 50)
+    if (freq < 222 && peak < 50)
+        return true;
+    if (freq < 111 && peak < 45)
         return true;
 
     return false;
+}
+
+void psvs_oc_change_max_freq(psvs_oc_device_t device, bool raise_freq) {
+    int max_freq = g_oc.max_freq[device]; // current max freq
+
+    for (int i = 0; i < g_oc_devopt[device].freq_n; i++) {
+        int ii = raise_freq ? i : g_oc_devopt[device].freq_n - i - 1;
+        if ((raise_freq && g_oc_devopt[device].freq[ii] > max_freq)
+                || (!raise_freq && g_oc_devopt[device].freq[ii] < max_freq)) {
+            max_freq = g_oc_devopt[device].freq[ii];
+            break;
+        }
+    }
+    // Update max freq
+    g_oc.max_freq[device] = max_freq;
+    if (g_oc.target_freq[device] > max_freq) {
+        g_oc.target_freq[device] = max_freq;
+        psvs_oc_set_target_freq(device);
+    }
+    g_oc_has_changed = true;
 }
 
 void psvs_oc_init() {
     g_oc_has_changed = true;
     for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++) {
         g_oc.mode[i] = PSVS_OC_MODE_DEFAULT;
-        psvs_oc_reset_manual(i);
+        psvs_oc_reset(i);
     }
 }
