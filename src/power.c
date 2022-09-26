@@ -6,13 +6,15 @@ bool psvs_power_cpu_raise_freq(int power_plan, int freq, int peak_usage, int avg
     switch (power_plan)
     {
         case PSVS_POWER_PLAN_SAVER:
-            if(freq <= 111 && peak_usage >= 55)
+            if(freq < 111 && peak_usage >= 55)
+                return true;
+            if(freq == 111 && peak_usage >= 65)
                 return true;
             if(freq <= 222 && peak_usage >= 70)
                 return true;
             if(freq == 333 && (peak_usage >= 85 || avg_usage >= 55))
                 return true;
-            if(freq == 444 && (peak_usage >=90 || avg_usage >= 62))
+            if(freq == 444 && (peak_usage >= 90 || avg_usage >= 62))
                 return true;
             break;
 
@@ -23,7 +25,7 @@ bool psvs_power_cpu_raise_freq(int power_plan, int freq, int peak_usage, int avg
                 return true;
             if(freq == 333 && (peak_usage >= 80 || avg_usage >= 50))
                 return true;
-            if(freq == 444 && (peak_usage >=85 || avg_usage >= 60))
+            if(freq == 444 && (peak_usage >= 85 || avg_usage >= 60))
                 return true;
             break;
 
@@ -32,9 +34,9 @@ bool psvs_power_cpu_raise_freq(int power_plan, int freq, int peak_usage, int avg
                 return true;
             if(freq <= 222 && peak_usage >= 55)
                 return true;
-            if(freq == 333 && (peak_usage >= 75 || avg_usage >= 50))
+            if(freq == 333 && (peak_usage >= 70 || avg_usage >= 50))
                 return true;
-            if(freq == 444 && (peak_usage >=80 || avg_usage >= 60))
+            if(freq == 444 && (peak_usage >= 75 || avg_usage >= 60))
                 return true;
             break;
         
@@ -76,9 +78,9 @@ bool psvs_power_cpu_lower_freq(int power_plan, int freq, int peak_usage) {
         case PSVS_POWER_PLAN_PERFORMANCE:
             if (freq == 500 && peak_usage < 70)
                 return true;
-            if (freq < 500 && peak_usage < 65)
+            if (freq < 500 && peak_usage < 60)
                 return true;
-            if (freq < 333 && peak_usage < 55)
+            if (freq < 333 && peak_usage < 52)
                 return true;
             if (freq < 222 && peak_usage < 50)
                 return true;
