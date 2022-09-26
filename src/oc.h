@@ -29,6 +29,7 @@ typedef struct {
     psvs_oc_mode_t mode[PSVS_OC_DEVICE_MAX];
     int target_freq[PSVS_OC_DEVICE_MAX];
     int max_freq[PSVS_OC_DEVICE_MAX];
+    int power_plan[PSVS_OC_DEVICE_MAX];
 } psvs_oc_profile_t;
 
 typedef struct {
@@ -66,6 +67,10 @@ void psvs_oc_change(psvs_oc_device_t device, bool raise_freq);
 bool psvs_oc_check_raise_freq(psvs_oc_device_t device);
 bool psvs_oc_check_lower_freq(psvs_oc_device_t device);
 void psvs_oc_change_max_freq(psvs_oc_device_t device, bool raise_freq);
+
+// power plan adjust
+int psvs_oc_get_power_plan(psvs_oc_device_t device);
+void psvs_oc_raise_power_plan(bool raise_plan, psvs_oc_device_t device);
 
 void psvs_oc_init();
 

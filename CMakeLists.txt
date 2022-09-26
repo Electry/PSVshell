@@ -25,6 +25,7 @@ add_executable(${PROJECT_NAME}
   src/perf.c
   src/oc.c
   src/profile.c
+  src/power.c
 )
 
 target_link_libraries(${PROJECT_NAME}

@@ -5,6 +5,7 @@
 
 #include "main.h"
 #include "oc.h"
+#include "power.h"
 
 // Declare helper getter/setter for GpuEs4
 static int __kscePowerGetGpuEs4ClockFrequency() {
@@ -51,7 +52,8 @@ static psvs_oc_profile_t g_oc = {
     .ver = PSVS_VERSION_VER,
     .mode = {0},
     .target_freq = {0},
-    .max_freq = {0}
+    .max_freq = {0},
+    .power_plan = {0}
 };
 static bool g_oc_has_changed = true;
 
@@ -201,17 +203,9 @@ bool psvs_oc_check_raise_freq(psvs_oc_device_t device) {
     int freq = g_oc_devopt[device].get_freq();
     int peak = psvs_perf_get_peak();
     int avg = (psvs_perf_get_load(0) + psvs_perf_get_load(1) + psvs_perf_get_load(2)) / 3;
+    int power_plan = g_oc.power_plan[device];
 
-    if(freq <= 111 && peak >= 50)
-        return true;
-    if(freq <= 222 && peak >= 60)
-        return true;
-    if(freq == 333 && (peak >= 80 || avg >= 50))
-        return true;
-    if(freq == 444 && (peak >=85 || avg >= 60))
-        return true;
-    
-    return false;
+    return psvs_power_cpu_raise_freq(power_plan, freq, peak, avg);
 }
 
 bool psvs_oc_check_lower_freq(psvs_oc_device_t device) {
@@ -220,19 +214,9 @@ bool psvs_oc_check_lower_freq(psvs_oc_device_t device) {
 
     int freq = g_oc_devopt[device].get_freq();
     int peak = psvs_perf_get_peak();
+    int power_plan = g_oc.power_plan[device];
 
-    if (freq == 500 && peak < 75)
-        return true;
-    if (freq < 500 && peak < 70)
-        return true;
-    if (freq < 333 && peak < 60)
-        return true;
-    if (freq < 222 && peak < 50)
-        return true;
-    if (freq < 111 && peak < 45)
-        return true;
-
-    return false;
+    return psvs_power_cpu_lower_freq(power_plan, freq, peak);
 }
 
 void psvs_oc_change_max_freq(psvs_oc_device_t device, bool raise_freq) {
@@ -252,6 +236,18 @@ void psvs_oc_change_max_freq(psvs_oc_device_t device, bool raise_freq) {
         g_oc.target_freq[device] = max_freq;
         psvs_oc_set_target_freq(device);
     }
+    g_oc_has_changed = true;
+}
+
+int psvs_oc_get_power_plan(psvs_oc_device_t device) {
+    return g_oc.power_plan[device];
+}
+
+void psvs_oc_raise_power_plan(bool raise_plan, psvs_oc_device_t device) {
+    if ((raise_plan && g_oc.power_plan[device] == PSVS_POWER_PLAN_PERFORMANCE) || (!raise_plan && g_oc.power_plan[device] == PSVS_POWER_PLAN_SAVER))
+        return;
+
+    g_oc.power_plan[device] += (raise_plan ? 1 : -1);
     g_oc_has_changed = true;
 }
 

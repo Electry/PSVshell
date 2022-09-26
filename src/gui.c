@@ -13,6 +13,7 @@
 #include "perf.h"
 #include "oc.h"
 #include "profile.h"
+#include "power.h"
 
 int vsnprintf(char *s, size_t n, const char *format, va_list arg);
 
@@ -132,6 +133,13 @@ void psvs_gui_input_check(uint32_t buttons) {
                     psvs_oc_change_max_freq(device, true);
                 } else if (buttons_new & SCE_CTRL_LEFT) {
                     psvs_oc_change_max_freq(device, false);
+                }
+                // Change power plan
+                if (buttons_new & SCE_CTRL_LTRIGGER) {
+                    psvs_oc_raise_power_plan(false, device);
+                }
+                else if (buttons_new & SCE_CTRL_RTRIGGER) {
+                    psvs_oc_raise_power_plan(true, device);
                 }
                 // Back to default
                 else if (buttons_new & SCE_CTRL_CROSS) {
@@ -682,8 +690,22 @@ static void _psvs_gui_draw_menu_item(int lines, int clock, psvs_gui_menu_control
         psvs_gui_set_text_color(0, 200, 255, 255);
     }
     // Highlight freq if in auto mode (red)
-    if (psvs_oc_get_mode(_psvs_gui_get_device_from_menuctrl(menuctrl)) == PSVS_OC_MODE_AUTO) {
-        psvs_gui_set_text_color(255, 0, 0, 255);
+    else if (psvs_oc_get_mode(_psvs_gui_get_device_from_menuctrl(menuctrl)) == PSVS_OC_MODE_AUTO) {
+        switch (psvs_oc_get_power_plan(_psvs_gui_get_device_from_menuctrl(menuctrl)))
+        {
+            case PSVS_POWER_PLAN_SAVER:
+                psvs_gui_set_text_color(51, 204, 51, 255);
+                break;
+            case PSVS_POWER_PLAN_BALANCED:
+                psvs_gui_set_text_color(255, 213, 0, 255);
+                break;
+            case PSVS_POWER_PLAN_PERFORMANCE:
+                psvs_gui_set_text_color(255, 0, 0, 255);
+                break;
+            
+            default:
+                break;
+        }
     }
     psvs_gui_printf(GUI_ANCHOR_CX(15) + GUI_ANCHOR_LX(0, 6),  GUI_ANCHOR_BY(10, lines), "%3d MHz", clock);
     psvs_gui_set_text_color(255, 255, 255, 255);
