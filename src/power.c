@@ -8,35 +8,35 @@ bool psvs_power_cpu_raise_freq(int power_plan, int freq, int peak_usage, int avg
         case PSVS_POWER_PLAN_SAVER:
             if(freq < 111 && peak_usage >= 55)
                 return true;
-            if(freq == 111 && peak_usage >= 65)
+            if(freq <= 111 && peak_usage >= 65)
                 return true;
-            if(freq <= 222 && peak_usage >= 70)
+            if(freq <= 222 && peak_usage >= 67)
                 return true;
-            if(freq == 333 && (peak_usage >= 85 || avg_usage >= 55))
+            if(freq <= 333 && (peak_usage >= 75 || avg_usage >= 55))
                 return true;
-            if(freq == 444 && (peak_usage >= 90 || avg_usage >= 62))
+            if(freq <= 500 && (peak_usage >= 85 || avg_usage >= 65))
                 return true;
             break;
 
         case PSVS_POWER_PLAN_BALANCED:
             if(freq <= 111 && peak_usage >= 50)
                 return true;
-            if(freq <= 222 && peak_usage >= 60)
+            if(freq <= 222 && peak_usage >= 57)
                 return true;
-            if(freq == 333 && (peak_usage >= 80 || avg_usage >= 50))
+            if(freq <= 333 && (peak_usage >= 60 || avg_usage >= 47))
                 return true;
-            if(freq == 444 && (peak_usage >= 85 || avg_usage >= 60))
+            if(freq <= 500 && (peak_usage >= 65 || avg_usage >= 60))
                 return true;
             break;
 
         case PSVS_POWER_PLAN_PERFORMANCE:
-            if(freq <= 111 && peak_usage >= 50)
+            if(freq <= 111 && peak_usage >= 40)
                 return true;
-            if(freq <= 222 && peak_usage >= 55)
+            if(freq <= 222 && peak_usage >= 47)
                 return true;
-            if(freq == 333 && (peak_usage >= 70 || avg_usage >= 50))
+            if(freq <= 333 && (peak_usage >= 55 || avg_usage >= 42))
                 return true;
-            if(freq == 444 && (peak_usage >= 75 || avg_usage >= 60))
+            if(freq <= 500 && (peak_usage >= 60 || avg_usage >= 50))
                 return true;
             break;
         
@@ -50,11 +50,9 @@ bool psvs_power_cpu_lower_freq(int power_plan, int freq, int peak_usage) {
     switch (power_plan)
     {
         case PSVS_POWER_PLAN_SAVER:
-            if (freq == 500 && peak_usage < 85)
+            if (freq <= 500 && peak_usage < 75)
                 return true;
-            if (freq < 500 && peak_usage < 80)
-                return true;
-            if (freq < 333 && peak_usage < 75)
+            if (freq < 333 && peak_usage < 67)
                 return true;
             if (freq < 222 && peak_usage < 60)
                 return true;
@@ -63,11 +61,9 @@ bool psvs_power_cpu_lower_freq(int power_plan, int freq, int peak_usage) {
             break;
 
         case PSVS_POWER_PLAN_BALANCED:
-            if (freq == 500 && peak_usage < 75)
+            if (freq <= 500 && peak_usage < 58)
                 return true;
-            if (freq < 500 && peak_usage < 70)
-                return true;
-            if (freq < 333 && peak_usage < 60)
+            if (freq < 333 && peak_usage < 55)
                 return true;
             if (freq < 222 && peak_usage < 50)
                 return true;
@@ -76,15 +72,13 @@ bool psvs_power_cpu_lower_freq(int power_plan, int freq, int peak_usage) {
             break;
 
         case PSVS_POWER_PLAN_PERFORMANCE:
-            if (freq == 500 && peak_usage < 70)
+            if (freq <= 500 && peak_usage < 50)
                 return true;
-            if (freq < 500 && peak_usage < 60)
+            if (freq < 333 && peak_usage < 47)
                 return true;
-            if (freq < 333 && peak_usage < 52)
+            if (freq < 222 && peak_usage < 45)
                 return true;
-            if (freq < 222 && peak_usage < 50)
-                return true;
-            if (freq < 111 && peak_usage < 45)
+            if (freq < 111 && peak_usage < 40)
                 return true;
             break;
         

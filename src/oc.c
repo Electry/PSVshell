@@ -27,7 +27,7 @@ PSVS_OC_DECL_SETTER(_kscePowerSetGpuXbarClockFrequency);
 
 static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
     [PSVS_OC_DEVICE_CPU] = {
-        .freq_n = 8, .freq = {41, 83, 111, 166, 222, 333, 444, 500}, .default_freq = 333,
+        .freq_n = 17, .freq = {41, 83, 111, 141, 166, 195, 222, 250, 271, 306, 333, 361, 389, 416, 444, 468, 500}, .default_freq = 333,
         .get_freq = __kscePowerGetArmClockFrequency,
         .set_freq = __kscePowerSetArmClockFrequency
     },
@@ -65,13 +65,25 @@ int psvs_oc_set_freq(psvs_oc_device_t device, int freq) {
     return g_oc_devopt[device].set_freq(freq);
 }
 
-void psvs_oc_holy_shit() {
-    // Apply mul:div (15:0)
-    ScePervasiveForDriver_0xE9D95643(15, 16 - 0);
+void psvs_oc_holy_shit(int freq) {
+    if (freq == 468)
+    {
+        // Apply mul:div (15:1)
+        ScePervasiveForDriver_0xE9D95643(15, 16 - 1);
 
-    // Store global freq & mul for kscePowerGetArmClockFrequency()
-    *ScePower_41C8 = 500;
-    *ScePower_41CC = 15;
+        // Store global freq & mul for kscePowerGetArmClockFrequency()
+        *ScePower_41C8 = 468;
+        *ScePower_41CC = 15;
+    }
+    else 
+    {
+        // Apply mul:div (15:0)
+        ScePervasiveForDriver_0xE9D95643(15, 16 - 0);
+
+        // Store global freq & mul for kscePowerGetArmClockFrequency()
+        *ScePower_41C8 = 500;
+        *ScePower_41CC = 15;
+    }
 }
 
 int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq) {
@@ -177,7 +189,7 @@ void psvs_oc_change(psvs_oc_device_t device, bool raise_freq) {
         }
     }
 
-    // Keep clocks inside the limits (111MHz to max_freq) in AUTO mode
+    // Keep clocks inside the limits (PSVS_OC_CPU_MIN_FREQ to max_freq) in AUTO mode
     if (g_oc.mode[device] == PSVS_OC_MODE_AUTO) {
         if (target_freq < PSVS_OC_CPU_MIN_FREQ)
             target_freq = PSVS_OC_CPU_MIN_FREQ;

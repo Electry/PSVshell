@@ -112,7 +112,7 @@ int kscePowerSetArmClockFrequency_patched(int freq) {
 
     if (freq > 444 && freq <= 500) {
         TAI_CONTINUE(int, g_hookrefs[9], 444);
-        psvs_oc_holy_shit();
+        psvs_oc_holy_shit(freq);
         ret = 0;
     } else {
         ret = TAI_CONTINUE(int, g_hookrefs[9], freq);

@@ -1,7 +1,7 @@
 #ifndef _OC_H_
 #define _OC_H_
 
-#define PSVS_OC_MAX_FREQ_N 10
+#define PSVS_OC_MAX_FREQ_N 20
 #define PSVS_OC_CPU_MIN_FREQ 83
 
 #define PSVS_OC_DECL_SETTER(fun) \
@@ -40,9 +40,10 @@ typedef struct {
     int (*set_freq)(int freq);
 } psvs_oc_devopt_t;
 
+
 int psvs_oc_get_freq(psvs_oc_device_t device);
 int psvs_oc_set_freq(psvs_oc_device_t device, int freq);
-void psvs_oc_holy_shit();
+void psvs_oc_holy_shit(int freq);
 
 int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq);
 int psvs_oc_get_max_freq(psvs_oc_device_t device);
