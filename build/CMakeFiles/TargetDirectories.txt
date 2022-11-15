@@ -1,5 +1,0 @@
-/home/marcos/Documentos/PSVita/PSVshell/build/CMakeFiles/PSVshell.dir
-/home/marcos/Documentos/PSVita/PSVshell/build/CMakeFiles/PSVshell-velf.dir
-/home/marcos/Documentos/PSVita/PSVshell/build/CMakeFiles/PSVshell.skprx-self.dir
-/home/marcos/Documentos/PSVita/PSVshell/build/CMakeFiles/edit_cache.dir
-/home/marcos/Documentos/PSVita/PSVshell/build/CMakeFiles/rebuild_cache.dir
