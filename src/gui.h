@@ -25,8 +25,8 @@
 #define GUI_ANCHOR_CX2(len, scale) (GUI_WIDTH / 2 - ((len) * GUI_FONT_W * (scale)) / 2)
 #define GUI_ANCHOR_CY(lines) (GUI_HEIGHT / 2 - ((lines) * GUI_FONT_H) / 2)
 
-#define GUI_RESCALE_X(x) (int)((x) * g_gui_fb_w_ratio)
-#define GUI_RESCALE_Y(y) (int)((y) * g_gui_fb_h_ratio)
+#define GUI_RESCALE_X(x) (int)((x) * (g_gui_fb_w_ratio > 1.0f ? 1.0f : g_gui_fb_w_ratio))
+#define GUI_RESCALE_Y(y) (int)((y) * (g_gui_fb_h_ratio > 1.0f ? 1.0f : g_gui_fb_h_ratio))
 
 #define GUI_GLOBAL_PROFILE_BUTTON_MOD SCE_CTRL_LTRIGGER
 

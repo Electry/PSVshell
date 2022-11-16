@@ -6,5 +6,5 @@ C_DEFINES =
 
 C_INCLUDES = 
 
-C_FLAGS =  -Wl,-q -Wl,-q -Wall -O3 -std=gnu99 -O0 -g -DDEBUG -D_DEBUG
+C_FLAGS =  -Wl,-q -Wl,-q -Wall -O3 -std=gnu99 -O3 -DNDEBUG
 

@@ -24,7 +24,7 @@ CMAKE_AR:PATH=/usr/local/vitasdk/bin/arm-vita-eabi-ar
 CMAKE_ASM_COMPILER:PATH=/usr/local/vitasdk/bin/arm-vita-eabi-gcc
 
 //No help, variable specified on the command line.
-CMAKE_BUILD_TYPE:STRING=Debug
+CMAKE_BUILD_TYPE:STRING=Release
 
 //Enable/Disable color output during build.
 CMAKE_COLOR_MAKEFILE:BOOL=ON

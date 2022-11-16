@@ -50,7 +50,7 @@ static bool g_gui_lazydraw_memusage = false;
 static const unsigned char GUI_CORNERS_XD[GUI_CORNERS_XD_RADIUS] = {9, 7, 5, 4, 3, 2, 2, 1, 1};
 
 static const rgba_t WHITE = {.rgba = {.r = 255, .g = 255, .b = 255, .a = 255}};
-static const rgba_t BLACK = {.rgba = {.r = 0, .g = 0, .b = 0, .a = 0}};
+static const rgba_t BLACK = {.rgba = {.r = 0, .g = 0, .b = 0, .a = 255}};
 static const rgba_t FPS_COLOR = {.rgba = {.r = 0, .g = 255, .b = 0, .a = 255}};
 
 psvs_gui_mode_t psvs_gui_get_mode() {
@@ -181,7 +181,7 @@ void psvs_gui_set_framebuf(const SceDisplayFrameBuf *pParam) {
         g_gui_font_width = 9; // <- trim last col, better scaling
         g_gui_font_height = 18;
     } else {
-        // 960x544 - Terminus 12x24 Bold
+        // 960x544 or more - Terminus 12x24 Bold
         g_gui_font = FONT_TER_U24B;
         g_gui_font_width = 12;
         g_gui_font_height = 24;
@@ -253,7 +253,7 @@ static void _psvs_gui_dd_prchar(const char character, int x, int y) {
             uint8_t charByte = g_gui_font[charPosH + (xx_font / 8)];
 
             if ((charByte >> (7 - (xx_font % 8))) & 1) {
-                ksceKernelMemcpyKernelToUser((uintptr_t)(px + xx), &FPS_COLOR, sizeof(rgba_t));
+                *(px + xx) = FPS_COLOR;
             }
         }
     }
@@ -264,9 +264,14 @@ void psvs_gui_dd_fps() {
     snprintf(buf, 4, "%d", psvs_perf_get_fps());
     size_t len = strlen(buf);
 
+    uint32_t dacr;
+    DACR_UNRESTRICT(dacr);
+
     for (int i = 0; i < len; i++) {
         _psvs_gui_dd_prchar(buf[i], 10 + i * g_gui_font_width * g_gui_font_scale, 10);
     }
+
+    DACR_RESET(dacr);
 }
 
 void psvs_gui_clear() {
@@ -531,7 +536,7 @@ void psvs_gui_draw_template() {
 
     // Header
     psvs_gui_set_text_scale(0.5f);
-    psvs_gui_printf(GUI_ANCHOR_CX2(13, 0.5f),     GUI_ANCHOR_TY(8, 0), PSVS_VERSION_STRING);
+    psvs_gui_printf(GUI_ANCHOR_CX2(18, 0.5f),     GUI_ANCHOR_TY(8, 0), PSVS_VERSION_STRING);
     psvs_gui_printf(GUI_ANCHOR_RX2(10, 10, 0.5f), GUI_ANCHOR_TY(8, 0), "by Electry");
     psvs_gui_set_text_scale(1.0f);
 
@@ -765,29 +770,38 @@ void psvs_gui_deinit() {
 void psvs_gui_cpy() {
     int height = (g_gui_mode == PSVS_GUI_MODE_OSD) ? GUI_OSD_HEIGHT : GUI_HEIGHT;
 
-    int w = (int)(GUI_WIDTH * (g_gui_fb.width / 960.0f));
-    int h = (int)(height * (g_gui_fb.height / 544.0f));
+    int w = GUI_RESCALE_X(GUI_WIDTH);
+    int h = GUI_RESCALE_Y(height);
     int x = (g_gui_mode == PSVS_GUI_MODE_OSD) ? 10 : (g_gui_fb.width / 2) - (w / 2);
     int y = (g_gui_mode == PSVS_GUI_MODE_OSD) ? 10 : (g_gui_fb.height / 2) - (h / 2);
 
+    uint32_t dacr;
+    DACR_UNRESTRICT(dacr);
+
     for (int line = 0; line < h; line++) {
         int xd = 0;
-        int xd_line = line * (544.0f / g_gui_fb.height);
+        int xd_line = line;
+        if (g_gui_fb.height < 544.0f)
+            xd_line = xd_line * (544.0f / g_gui_fb.height);
 
         // Top corners
         if (xd_line < GUI_CORNERS_XD_RADIUS) {
-            xd = GUI_CORNERS_XD[xd_line] * (g_gui_fb.width / 960.0f);
+            xd = GUI_RESCALE_X(GUI_CORNERS_XD[xd_line]);
         }
 
         // Bottom corners
-        if (xd_line >= height - GUI_CORNERS_XD_RADIUS) {
-            xd = GUI_CORNERS_XD[height - xd_line - 1] * (g_gui_fb.width / 960.0f);
+        else if (xd_line >= height - GUI_CORNERS_XD_RADIUS) {
+            xd = GUI_RESCALE_X(GUI_CORNERS_XD[height - xd_line - 1]);
         }
 
         int off = ((line + y) * g_gui_fb.pitch + x + xd);
-        ksceKernelMemcpyKernelToUser(
-            (uintptr_t)&((rgba_t *)g_gui_fb.base)[off],
-            &((rgba_t *)g_gui_buffer)[line * GUI_WIDTH + xd],
-            sizeof(rgba_t) * (w - xd*2));
+
+        void *src = &((rgba_t *)g_gui_buffer)[line * GUI_WIDTH + xd];
+        void *dest = &((rgba_t *)g_gui_fb.base)[off];
+        int size = sizeof(rgba_t) * (w - xd*2);
+
+        memcpy(dest, src, size);
     }
+
+    DACR_RESET(dacr);
 }
