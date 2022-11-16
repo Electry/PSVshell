@@ -5,6 +5,7 @@
 
 #include "main.h"
 #include "oc.h"
+#include "power.h"
 
 // Declare helper getter/setter for GpuEs4
 static int __kscePowerGetGpuEs4ClockFrequency() {
@@ -26,7 +27,7 @@ PSVS_OC_DECL_SETTER(_kscePowerSetGpuXbarClockFrequency);
 
 static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
     [PSVS_OC_DEVICE_CPU] = {
-        .freq_n = 8, .freq = {41, 83, 111, 166, 222, 333, 444, 500}, .default_freq = 333,
+        .freq_n = 17, .freq = {41, 83, 111, 141, 166, 195, 222, 250, 271, 306, 333, 361, 389, 416, 444, 468, 500}, .default_freq = 333,
         .get_freq = __kscePowerGetArmClockFrequency,
         .set_freq = __kscePowerSetArmClockFrequency
     },
@@ -51,7 +52,8 @@ static psvs_oc_profile_t g_oc = {
     .ver = PSVS_VERSION_VER,
     .mode = {0},
     .target_freq = {0},
-    .max_freq = {0}
+    .max_freq = {0},
+    .power_plan = {0}
 };
 static bool g_oc_has_changed = true;
 
@@ -63,13 +65,25 @@ int psvs_oc_set_freq(psvs_oc_device_t device, int freq) {
     return g_oc_devopt[device].set_freq(freq);
 }
 
-void psvs_oc_holy_shit() {
-    // Apply mul:div (15:0)
-    ScePervasiveForDriver_0xE9D95643(15, 16 - 0);
+void psvs_oc_holy_shit(int freq) {
+    if (freq == 468)
+    {
+        // Apply mul:div (15:1)
+        ScePervasiveForDriver_0xE9D95643(15, 16 - 1);
 
-    // Store global freq & mul for kscePowerGetArmClockFrequency()
-    *ScePower_41C8 = 500;
-    *ScePower_41CC = 15;
+        // Store global freq & mul for kscePowerGetArmClockFrequency()
+        *ScePower_41C8 = 468;
+        *ScePower_41CC = 15;
+    }
+    else 
+    {
+        // Apply mul:div (15:0)
+        ScePervasiveForDriver_0xE9D95643(15, 16 - 0);
+
+        // Store global freq & mul for kscePowerGetArmClockFrequency()
+        *ScePower_41C8 = 500;
+        *ScePower_41CC = 15;
+    }
 }
 
 int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq) {
@@ -175,7 +189,7 @@ void psvs_oc_change(psvs_oc_device_t device, bool raise_freq) {
         }
     }
 
-    // Keep clocks inside the limits (111MHz to max_freq) in AUTO mode
+    // Keep clocks inside the limits (PSVS_OC_CPU_MIN_FREQ to max_freq) in AUTO mode
     if (g_oc.mode[device] == PSVS_OC_MODE_AUTO) {
         if (target_freq < PSVS_OC_CPU_MIN_FREQ)
             target_freq = PSVS_OC_CPU_MIN_FREQ;
@@ -201,17 +215,9 @@ bool psvs_oc_check_raise_freq(psvs_oc_device_t device) {
     int freq = g_oc_devopt[device].get_freq();
     int peak = psvs_perf_get_peak();
     int avg = (psvs_perf_get_load(0) + psvs_perf_get_load(1) + psvs_perf_get_load(2)) / 3;
+    int power_plan = g_oc.power_plan[device];
 
-    if(freq <= 111 && peak >= 50)
-        return true;
-    if(freq <= 222 && peak >= 60)
-        return true;
-    if(freq == 333 && (peak >= 80 || avg >= 50))
-        return true;
-    if(freq == 444 && (peak >=85 || avg >= 60))
-        return true;
-    
-    return false;
+    return psvs_power_cpu_raise_freq(power_plan, freq, peak, avg);
 }
 
 bool psvs_oc_check_lower_freq(psvs_oc_device_t device) {
@@ -220,19 +226,9 @@ bool psvs_oc_check_lower_freq(psvs_oc_device_t device) {
 
     int freq = g_oc_devopt[device].get_freq();
     int peak = psvs_perf_get_peak();
+    int power_plan = g_oc.power_plan[device];
 
-    if (freq == 500 && peak < 75)
-        return true;
-    if (freq < 500 && peak < 70)
-        return true;
-    if (freq < 333 && peak < 60)
-        return true;
-    if (freq < 222 && peak < 50)
-        return true;
-    if (freq < 111 && peak < 45)
-        return true;
-
-    return false;
+    return psvs_power_cpu_lower_freq(power_plan, freq, peak);
 }
 
 void psvs_oc_change_max_freq(psvs_oc_device_t device, bool raise_freq) {
@@ -252,6 +248,18 @@ void psvs_oc_change_max_freq(psvs_oc_device_t device, bool raise_freq) {
         g_oc.target_freq[device] = max_freq;
         psvs_oc_set_target_freq(device);
     }
+    g_oc_has_changed = true;
+}
+
+int psvs_oc_get_power_plan(psvs_oc_device_t device) {
+    return g_oc.power_plan[device];
+}
+
+void psvs_oc_raise_power_plan(bool raise_plan, psvs_oc_device_t device) {
+    if ((raise_plan && g_oc.power_plan[device] == PSVS_POWER_PLAN_PERFORMANCE) || (!raise_plan && g_oc.power_plan[device] == PSVS_POWER_PLAN_SAVER))
+        return;
+
+    g_oc.power_plan[device] += (raise_plan ? 1 : -1);
     g_oc_has_changed = true;
 }
 

@@ -1,7 +1,7 @@
 #ifndef _OC_H_
 #define _OC_H_
 
-#define PSVS_OC_MAX_FREQ_N 10
+#define PSVS_OC_MAX_FREQ_N 20
 #define PSVS_OC_CPU_MIN_FREQ 83
 
 #define PSVS_OC_DECL_SETTER(fun) \
@@ -29,6 +29,7 @@ typedef struct {
     psvs_oc_mode_t mode[PSVS_OC_DEVICE_MAX];
     int target_freq[PSVS_OC_DEVICE_MAX];
     int max_freq[PSVS_OC_DEVICE_MAX];
+    int power_plan[PSVS_OC_DEVICE_MAX];
 } psvs_oc_profile_t;
 
 typedef struct {
@@ -39,9 +40,10 @@ typedef struct {
     int (*set_freq)(int freq);
 } psvs_oc_devopt_t;
 
+
 int psvs_oc_get_freq(psvs_oc_device_t device);
 int psvs_oc_set_freq(psvs_oc_device_t device, int freq);
-void psvs_oc_holy_shit();
+void psvs_oc_holy_shit(int freq);
 
 int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq);
 int psvs_oc_get_max_freq(psvs_oc_device_t device);
@@ -66,6 +68,10 @@ void psvs_oc_change(psvs_oc_device_t device, bool raise_freq);
 bool psvs_oc_check_raise_freq(psvs_oc_device_t device);
 bool psvs_oc_check_lower_freq(psvs_oc_device_t device);
 void psvs_oc_change_max_freq(psvs_oc_device_t device, bool raise_freq);
+
+// power plan adjust
+int psvs_oc_get_power_plan(psvs_oc_device_t device);
+void psvs_oc_raise_power_plan(bool raise_plan, psvs_oc_device_t device);
 
 void psvs_oc_init();
 
