@@ -253,7 +253,8 @@ CMakeFiles/PSVshell.dir/src/main.c.obj: ../src/main.c \
   ../src/perf.h \
   ../src/oc.h \
   ../src/gui.h \
-  ../src/profile.h
+  ../src/profile.h \
+  ../src/power.h
 
 CMakeFiles/PSVshell.dir/src/oc.c.obj: ../src/oc.c \
   /usr/local/vitasdk/arm-vita-eabi/include/vitasdkkern.h \
@@ -458,6 +459,7 @@ CMakeFiles/PSVshell.dir/src/perf.c.obj: ../src/perf.c \
   /usr/local/vitasdk/arm-vita-eabi/include/psp2kern/net/net.h \
   /usr/local/vitasdk/arm-vita-eabi/include/taihen.h \
   /usr/local/vitasdk/lib/gcc/arm-vita-eabi/10.3.0/include/stdbool.h \
+  ../src/power.h \
   ../src/main.h \
   ../src/perf.h
 

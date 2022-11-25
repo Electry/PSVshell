@@ -5,7 +5,8 @@
 #define GUI_WIDTH  308
 #define GUI_HEIGHT 344
 
-#define GUI_OSD_HEIGHT 64
+//#define GUI_OSD_HEIGHT 64
+#define GUI_OSD_HEIGHT 96
 
 #define GUI_BATT_SIZE_W 32
 #define GUI_BATT_SIZE_H 16

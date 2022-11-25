@@ -9,6 +9,7 @@
 #include "gui.h"
 #include "perf.h"
 #include "profile.h"
+#include "power.h"
 
 int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintptr_t *addr);
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
@@ -22,10 +23,11 @@ static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
 static SceUID         g_hooks[PSVS_MAX_HOOKS];
 static SceUID         g_injects[1];
 
+#define PSVS_NUM_THREADS 2
 static SceUID g_mutex_cpufreq_uid = -1;
 static SceUID g_mutex_procevent_uid = -1;
 static SceUID g_mutex_framebuf_uid = -1;
-static SceUID g_thread_uid = -1;
+static SceUID g_thread_uid[] = { -1, -1 };
 static bool   g_thread_run = true;
 
 SceUID g_pid = INVALID_PID;
@@ -255,8 +257,7 @@ PROCEVENT_EXIT:
     return TAI_CONTINUE(int, g_hookrefs[13], pid, ev, a3, a4, a5, a6);
 }
 
-static int psvs_thread(SceSize args, void *argp) {
-    int counter = 0;
+static int psvs_gui_thread(SceSize args, void *argp) {
     while (g_thread_run) {
         if (g_app == PSVS_APP_BLACKLIST) {
             // Don't do anything if blacklisted app is running
@@ -277,24 +278,13 @@ static int psvs_thread(SceSize args, void *argp) {
 
         // If in OSD/FULL mode, poll shown info
         if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
-            psvs_perf_poll_cpu();
+            if(psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) != PSVS_OC_MODE_AUTO) 
+                psvs_perf_poll_cpu(PSVS_POWER_PLAN_MAX);
             psvs_perf_poll_batt();
         }
-        
-        // Compute dynamic cpu freq if auto mode is selected
-        if (psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) == PSVS_OC_MODE_AUTO) {
-            if (psvs_oc_check_raise_freq(PSVS_OC_DEVICE_CPU)) {
-                psvs_oc_change(PSVS_OC_DEVICE_CPU, true);
-                counter = 0;
-            }
-            if (psvs_oc_check_lower_freq(PSVS_OC_DEVICE_CPU) && counter >= 10) {
-                psvs_oc_change(PSVS_OC_DEVICE_CPU, false);
-                counter = 0;
-            }
-            // Add time space between freq shift when lowering freq
-            if (counter < 10)
-                counter++;
-        }
+
+        // Measure system power consumption
+        psvs_perf_compute_power();
 
         // Redraw buffer template on gui mode or fb change
         if (fb_or_mode_changed) {
@@ -322,6 +312,37 @@ static int psvs_thread(SceSize args, void *argp) {
         }
 
         ksceKernelDelayThread(50 * 1000);
+    }
+
+    return 0;
+}
+
+static int psvs_auto_clocks_thread(SceSize args, void *argp) {
+    uint8_t counter = 0;
+    const uint8_t min_counter_value = 25;
+    while (g_thread_run) {
+        if (g_app == PSVS_APP_BLACKLIST || psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) != PSVS_OC_MODE_AUTO) {
+            // Don't do anything if blacklisted app is running
+            ksceKernelDelayThread(200 * 1000);
+            continue;
+        }
+
+        // Poll cpu information to perform clocks control
+        psvs_perf_poll_cpu(psvs_oc_get_power_plan(PSVS_OC_DEVICE_CPU));
+        
+        // Compute dynamic cpu freq if auto mode is selected
+        if (psvs_oc_check_raise_freq(PSVS_OC_DEVICE_CPU)) {
+            psvs_oc_change(PSVS_OC_DEVICE_CPU, true);
+            counter = 0;
+        }
+        if (psvs_oc_check_lower_freq(PSVS_OC_DEVICE_CPU) && counter >= min_counter_value) {
+            psvs_oc_change(PSVS_OC_DEVICE_CPU, false);
+            counter /= 2;
+        }
+        
+        if (counter < min_counter_value) 
+            counter++;
+        ksceKernelDelayThread(20 * 1000);
     }
 
     return 0;
@@ -429,17 +450,24 @@ int module_start(SceSize argc, const void *args) {
     snprintf(g_titleid, sizeof(g_titleid), "main");
     psvs_profile_load();
 
-    g_thread_uid = ksceKernelCreateThread("psvs_thread", psvs_thread, 0x3C, 0x3000, 0, 0x10000, 0);
-    ksceKernelStartThread(g_thread_uid, 0, NULL);
+    // Init variables for power measurement
+    psvs_perf_init_power_meter();
+
+    g_thread_uid[0] = ksceKernelCreateThread("psvs_gui_thread", psvs_gui_thread, 0x3C, 0x3000, 0, 0x10000, 0);
+    g_thread_uid[1] = ksceKernelCreateThread("psvs_auto_clocks_thread", psvs_auto_clocks_thread, 0x3B, 0x2000, 0, 0x10000, 0);
+    ksceKernelStartThread(g_thread_uid[0], 0, NULL);
+    ksceKernelStartThread(g_thread_uid[1], 0, NULL);
 
     return SCE_KERNEL_START_SUCCESS;
 }
 
 int module_stop(SceSize argc, const void *args) {
-    if (g_thread_uid >= 0) {
-        g_thread_run = 0;
-        ksceKernelWaitThreadEnd(g_thread_uid, NULL, NULL);
-        ksceKernelDeleteThread(g_thread_uid);
+    for(uint i = 0; i < PSVS_NUM_THREADS; i++) {
+        if (g_thread_uid[i] >= 0) {
+            g_thread_run = 0;
+            ksceKernelWaitThreadEnd(g_thread_uid[i], NULL, NULL);
+            ksceKernelDeleteThread(g_thread_uid[i]);
+        }
     }
 
     for (int i = 0; i < PSVS_MAX_HOOKS; i++) {

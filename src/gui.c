@@ -473,6 +473,10 @@ void psvs_gui_draw_osd_template() {
     // Battery
     psvs_gui_printf(GUI_ANCHOR_RX(20 + GUI_BATT_SIZE_W, 1), GUI_ANCHOR_TY(10, 1), "%%");
     _psvs_gui_draw_battery_template(GUI_ANCHOR_RX(14 + GUI_BATT_SIZE_W, 0), GUI_ANCHOR_TY(13, 1));
+
+    // System Consumption
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(12, 2), "Consumption:");
+    psvs_gui_printf(GUI_ANCHOR_RX(10, 2),  GUI_ANCHOR_TY(12, 2), "mW");
 }
 
 void psvs_gui_draw_osd_cpu() {
@@ -487,10 +491,11 @@ void psvs_gui_draw_osd_cpu() {
 
     // Draw peak load
     //val = psvs_perf_get_peak();
+    // Draw cpu freq
     val = psvs_oc_get_freq(PSVS_OC_DEVICE_CPU);
     //psvs_gui_set_text_color2(psvs_gui_scale_color(val, 0, 100));
     psvs_gui_set_text_color2(psvs_gui_scale_color(val, 41, 500));
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 7), GUI_ANCHOR_TY(10, 1), "%3d", val);
+    psvs_gui_printf(GUI_ANCHOR_LX(8, 7), GUI_ANCHOR_TY(10, 1), "%3d", val);
 
     psvs_gui_set_text_color(255, 255, 255, 255);
 }
@@ -514,6 +519,15 @@ void psvs_gui_draw_osd_batt() {
     color.rgba.b = (int)(color.rgba.b * 0.75f);
     _psvs_gui_draw_battery(GUI_ANCHOR_RX(14 + GUI_BATT_SIZE_W, 0), GUI_ANCHOR_TY(13, 1), batt->percent, batt->is_charging, color);
 
+    // Draw system power consumption
+    color = psvs_gui_scale_color(batt->power_cons, 500, 5000);
+    psvs_gui_set_text_color2(color);
+
+    if (abs(batt->power_cons) < 10000) {
+        int len = 6 + (batt->power_cons < 0 ? 1 : 0);
+
+        psvs_gui_printf(GUI_ANCHOR_RX(12, len), GUI_ANCHOR_TY(12, 2), "%4d", batt->power_cons);
+    }
     psvs_gui_set_text_color(255, 255, 255, 255);
 }
 

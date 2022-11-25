@@ -213,7 +213,7 @@ bool psvs_oc_check_raise_freq(psvs_oc_device_t device) {
         return false;
 
     int freq = g_oc_devopt[device].get_freq();
-    int peak = psvs_perf_get_peak();
+    int peak = psvs_perf_get_smooth_peak();
     int avg = (psvs_perf_get_load(0) + psvs_perf_get_load(1) + psvs_perf_get_load(2)) / 3;
     int power_plan = g_oc.power_plan[device];
 
@@ -225,7 +225,7 @@ bool psvs_oc_check_lower_freq(psvs_oc_device_t device) {
         return false;
 
     int freq = g_oc_devopt[device].get_freq();
-    int peak = psvs_perf_get_peak();
+    int peak = psvs_perf_get_smooth_peak();
     int power_plan = g_oc.power_plan[device];
 
     return psvs_power_cpu_lower_freq(power_plan, freq, peak);

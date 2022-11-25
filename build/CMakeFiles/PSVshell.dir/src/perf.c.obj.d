@@ -91,5 +91,6 @@ CMakeFiles/PSVshell.dir/src/perf.c.obj: \
  /usr/local/vitasdk/arm-vita-eabi/include/psp2kern/net/net.h \
  /usr/local/vitasdk/arm-vita-eabi/include/taihen.h \
  /usr/local/vitasdk/lib/gcc/arm-vita-eabi/10.3.0/include/stdbool.h \
+ /home/marcos/Documentos/PSVita/PSVshell/src/power.h \
  /home/marcos/Documentos/PSVita/PSVshell/src/main.h \
  /home/marcos/Documentos/PSVita/PSVshell/src/perf.h

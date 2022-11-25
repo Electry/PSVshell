@@ -3,7 +3,7 @@ Yet another overclocking plugin
 
 ## Features:
 - Allows you to change CPU, GPU, BUS and XBAR clocks separately, in these steps:
-  - **CPU:** 41, 83, 111, 166, 222, 333, 444, 500 MHz
+  - **CPU:** 41, 83, 111, 141, 166, 195, 222, 250, 271, 306, 333, 361, 389, 416, 444, 468, 500 MHz
   - **GPU (ES4):** 41, 55, 83, 111, 166, 222 MHz
   - **BUS:** 55, 83, 111, 166, 222 MHz
   - **XBAR:** 83, 111, 166 MHz
@@ -25,6 +25,14 @@ Yet another overclocking plugin
   - **Default freq.** (WHITE) - the plugin will not interfere, but rather use the default freq. for current game
   - **Manual freq.** (BLUE) - the plugin will use your specified freq.
     - press **LEFT/RIGHT** to immediately change the frequency
+- Press **O** to activate auto frequency mode for currently selected **> device <** (only works for CPU):
+  - **Default freq.** (WHITE) - the plugin will not interfere, but rather use the default freq. for current game
+  - **Auto freq.** - the plugin will use your specified power plan. **(Do not use in LiveArea to avoid crashes)**
+    - press **LEFT/RIGHT** to immediately change the max frequency. This frequency won't be surpassed.
+    - press **LEFT TRIGGER/RIGHT TRIGGER** immediately change the power plan.
+      - **Power Saving** (GREEN) - Less agressive power plan. Ideal for less demanding apps.
+      - **Balanced** (YELLOW) - Balanced power plan.
+      - **Performance** (RED) - Most agressive power plan. Best suited for demanding games.
 - Press **X** when **> save profile <** is selected to save/delete profiles
   - All **Manual freq.** (BLUE) will be loaded and applied next time you start/resume the game
   - All **Default freq.** (WHITE) will be kept to default (set to whatever freq. the game asks for)

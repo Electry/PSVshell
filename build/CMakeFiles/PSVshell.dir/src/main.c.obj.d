@@ -122,4 +122,5 @@ CMakeFiles/PSVshell.dir/src/main.c.obj: \
  /home/marcos/Documentos/PSVita/PSVshell/src/perf.h \
  /home/marcos/Documentos/PSVita/PSVshell/src/oc.h \
  /home/marcos/Documentos/PSVita/PSVshell/src/gui.h \
- /home/marcos/Documentos/PSVita/PSVshell/src/profile.h
+ /home/marcos/Documentos/PSVita/PSVshell/src/profile.h \
+ /home/marcos/Documentos/PSVita/PSVshell/src/power.h
