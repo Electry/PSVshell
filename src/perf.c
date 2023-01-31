@@ -1,6 +1,7 @@
 #include <vitasdkkern.h>
 #include <taihen.h>
 #include <stdbool.h>
+#include <display.h>
 
 #include "power.h"
 #include "main.h"
@@ -20,7 +21,7 @@ static int g_peak_smooth_usage = 50;
 static SceUInt32 g_perf_tick_last = 0;      // AVG CPU load
 static SceUInt32 g_perf_tick_q_last = 0;    // Peak CPU load
 static SceUInt32 g_perf_tick_fps_last = 0;  // Framerate
-static SceUInt32 g_perf_tick_power_last;    // Power consumption
+static SceUInt32 g_perf_tick_power_last = 0;    // Power consumption
 
 static SceKernelSysClock g_perf_idle_clock_last[4] = {0, 0, 0, 0};
 static SceKernelSysClock g_perf_idle_clock_q_last[4] = {0, 0, 0, 0};
@@ -229,4 +230,11 @@ void psvs_perf_compute_power() {
             g_perf_tick_power_last = ksceKernelGetProcessTimeLowCore();
         }
     }
+}
+
+void psvs_perf_reset_peak(bool raise)
+{
+    g_peak_smooth_usage = (int) ((raise ? g_peak_smooth_usage * 0.93f : g_peak_smooth_usage * 1.07f) + 0.5f);
+    for (uint8_t i = 0; i < PSVS_PERF_PEAK_SAMPLES; i++)
+        g_perf_peak_usage_samples[i] = g_peak_smooth_usage;
 }

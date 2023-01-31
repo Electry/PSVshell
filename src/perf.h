@@ -49,6 +49,7 @@ void psvs_perf_poll_batt();
 
 void psvs_perf_init_power_meter();
 void psvs_perf_compute_power();
+void psvs_perf_reset_peak(bool raise);
 
 int psvs_perf_get_fps();
 int psvs_perf_get_load(int core);

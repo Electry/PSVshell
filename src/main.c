@@ -319,7 +319,8 @@ static int psvs_gui_thread(SceSize args, void *argp) {
 
 static int psvs_auto_clocks_thread(SceSize args, void *argp) {
     uint8_t counter = 0;
-    const uint8_t min_counter_value = 25;
+    const uint8_t min_lower_counter_value = 25;
+    const uint8_t min_raise_counter_value = 3;
     while (g_thread_run) {
         if (g_app == PSVS_APP_BLACKLIST || psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) != PSVS_OC_MODE_AUTO) {
             // Don't do anything if blacklisted app is running
@@ -331,16 +332,16 @@ static int psvs_auto_clocks_thread(SceSize args, void *argp) {
         psvs_perf_poll_cpu(psvs_oc_get_power_plan(PSVS_OC_DEVICE_CPU));
         
         // Compute dynamic cpu freq if auto mode is selected
-        if (psvs_oc_check_raise_freq(PSVS_OC_DEVICE_CPU)) {
+        if (psvs_oc_check_raise_freq(PSVS_OC_DEVICE_CPU) && counter >= min_raise_counter_value) {
             psvs_oc_change(PSVS_OC_DEVICE_CPU, true);
             counter = 0;
         }
-        if (psvs_oc_check_lower_freq(PSVS_OC_DEVICE_CPU) && counter >= min_counter_value) {
+        if (psvs_oc_check_lower_freq(PSVS_OC_DEVICE_CPU) && counter >= min_lower_counter_value) {
             psvs_oc_change(PSVS_OC_DEVICE_CPU, false);
             counter /= 2;
         }
         
-        if (counter < min_counter_value) 
+        if (counter < min_lower_counter_value) 
             counter++;
         ksceKernelDelayThread(20 * 1000);
     }

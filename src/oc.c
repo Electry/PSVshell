@@ -27,7 +27,7 @@ PSVS_OC_DECL_SETTER(_kscePowerSetGpuXbarClockFrequency);
 
 static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
     [PSVS_OC_DEVICE_CPU] = {
-        .freq_n = 17, .freq = {41, 83, 111, 141, 166, 195, 222, 250, 271, 306, 333, 361, 389, 416, 444, 468, 500}, .default_freq = 333,
+        .freq_n = 31, .freq = {41, 83, 111, 126, 136, 141, 153, 166, 173, 181, 195, 209, 222, 230, 250, 271, 282, 292, 306, 313, 333, 344, 361, 375, 389, 406, 416, 437, 444, 468, 500}, .default_freq = 333,
         .get_freq = __kscePowerGetArmClockFrequency,
         .set_freq = __kscePowerSetArmClockFrequency
     },
@@ -248,6 +248,10 @@ void psvs_oc_change_max_freq(psvs_oc_device_t device, bool raise_freq) {
         g_oc.target_freq[device] = max_freq;
         psvs_oc_set_target_freq(device);
     }
+
+    if (device == PSVS_OC_DEVICE_CPU)
+        psvs_perf_reset_peak(raise_freq);
+
     g_oc_has_changed = true;
 }
 
