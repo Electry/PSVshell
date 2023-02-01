@@ -1,7 +1,6 @@
 #include <vitasdkkern.h>
 #include <taihen.h>
 #include <stdbool.h>
-#include <display.h>
 
 #include "power.h"
 #include "main.h"
@@ -38,6 +37,16 @@ static int g_perf_batt_capacity_last;
 
 int psvs_perf_get_fps() {
     return g_perf_fps;
+}
+
+int psvs_perf_get_fps_cap()
+{
+    if (g_perf_fps <= 31)
+        return PSVS_PERF_FPS_30;
+    else if (g_perf_fps <= 61)
+        return PSVS_PERF_FPS_60;
+    else   
+        return PSVS_PERF_FPS_UNCAP;
 }
 
 int psvs_perf_get_load(int core) {

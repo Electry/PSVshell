@@ -5,8 +5,10 @@
 #define GUI_WIDTH  308
 #define GUI_HEIGHT 344
 
-//#define GUI_OSD_HEIGHT 64
+#define GUI_OSD2_WIDTH 960
+
 #define GUI_OSD_HEIGHT 96
+#define GUI_OSD2_HEIGHT 32
 
 #define GUI_BATT_SIZE_W 32
 #define GUI_BATT_SIZE_H 16
@@ -46,6 +48,7 @@ typedef enum {
     PSVS_GUI_MODE_FULL,
     PSVS_GUI_MODE_FPS,
     PSVS_GUI_MODE_OSD,
+    PSVS_GUI_MODE_OSD2,
     PSVS_GUI_MODE_MAX
 } psvs_gui_mode_t;
 
@@ -85,6 +88,13 @@ void psvs_gui_draw_osd_template();
 void psvs_gui_draw_osd_cpu();
 void psvs_gui_draw_osd_fps();
 void psvs_gui_draw_osd_batt();
+
+void psvs_gui_draw_osd2_template();
+void psvs_gui_draw_osd2_cpu();
+void psvs_gui_draw_osd2_gpu();
+void psvs_gui_draw_osd2_fps();
+void psvs_gui_draw_osd2_batt();
+void psvs_gui_draw_osd2_mem();
 
 void psvs_gui_draw_template();
 void psvs_gui_draw_header();

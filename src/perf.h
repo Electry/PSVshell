@@ -5,6 +5,12 @@
     if (struct.field != (new_value)) struct._has_changed = true; \
     struct.field = (new_value)
 
+typedef enum {
+    PSVS_PERF_FPS_30,
+    PSVS_PERF_FPS_60,
+    PSVS_PERF_FPS_UNCAP
+} psvs_perf_fps_cap_t;
+
 typedef struct SceKernelSystemInfo {
     SceSize   size;
     SceUInt32 activeCpuMask;
@@ -52,6 +58,7 @@ void psvs_perf_compute_power();
 void psvs_perf_reset_peak(bool raise);
 
 int psvs_perf_get_fps();
+int psvs_perf_get_fps_cap();
 int psvs_perf_get_load(int core);
 int psvs_perf_get_peak();
 int psvs_perf_get_smooth_peak();

@@ -92,7 +92,7 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
 
     psvs_perf_calc_fps();
 
-    if (mode == PSVS_GUI_MODE_FULL)
+    if (mode == PSVS_GUI_MODE_FULL || mode == PSVS_GUI_MODE_OSD2)
         psvs_perf_poll_memory();
 
     psvs_gui_set_framebuf(pParam);
@@ -101,7 +101,7 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
         psvs_gui_dd_fps(); // draw fps onto fb
     }
 
-    if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
+    if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_OSD2 || mode == PSVS_GUI_MODE_FULL) {
         psvs_gui_cpy(); // cpy from buffer
 
         if (sync && mode == PSVS_GUI_MODE_FULL && g_app != PSVS_APP_SCESHELL && g_app != PSVS_APP_SYSTEM) {
@@ -277,7 +277,7 @@ static int psvs_gui_thread(SceSize args, void *argp) {
         psvs_gui_mode_t mode = psvs_gui_get_mode();
 
         // If in OSD/FULL mode, poll shown info
-        if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
+        if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_OSD2 || mode == PSVS_GUI_MODE_FULL) {
             if(psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) != PSVS_OC_MODE_AUTO) 
                 psvs_perf_poll_cpu(PSVS_POWER_PLAN_MAX);
             psvs_perf_poll_batt();
@@ -290,6 +290,8 @@ static int psvs_gui_thread(SceSize args, void *argp) {
         if (fb_or_mode_changed) {
             if (mode == PSVS_GUI_MODE_OSD) {
                 psvs_gui_draw_osd_template();
+            } else if (mode == PSVS_GUI_MODE_OSD2) {
+                psvs_gui_draw_osd2_template();
             } else if (mode == PSVS_GUI_MODE_FULL) {
                 psvs_gui_draw_template();
             }
@@ -300,6 +302,15 @@ static int psvs_gui_thread(SceSize args, void *argp) {
             psvs_gui_draw_osd_cpu();
             psvs_gui_draw_osd_fps();
             psvs_gui_draw_osd_batt();
+        }
+
+        // Draw OSD2 mode
+        else if (mode == PSVS_GUI_MODE_OSD2) {
+            psvs_gui_draw_osd2_cpu();
+            psvs_gui_draw_osd2_gpu();
+            psvs_gui_draw_osd2_mem();
+            psvs_gui_draw_osd2_fps();
+            psvs_gui_draw_osd2_batt();
         }
 
         // Draw FULL mode
