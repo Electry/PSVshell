@@ -572,30 +572,48 @@ void psvs_gui_draw_osd2_template() {
     psvs_gui_clear();
 
     // Battery and System Consumption
+    psvs_gui_set_text_color(255, 155, 135, 255);
     psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(4, 0), "BATT:");
+    psvs_gui_set_text_color(255, 255, 255, 255);
     psvs_gui_printf(GUI_ANCHOR_LX(10, 9), GUI_ANCHOR_TY(4, 0), "%%");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 15), GUI_ANCHOR_TY(4, 0), "W");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 16), GUI_ANCHOR_TY(4, 0), " | ");
+    psvs_gui_printf(GUI_ANCHOR_LX(12, 15), GUI_ANCHOR_TY(4, 0), "W");
+    psvs_gui_set_text_color(196, 155, 207, 255);
+    psvs_gui_printf(GUI_ANCHOR_LX(12, 16), GUI_ANCHOR_TY(4, 0), " | ");
+    psvs_gui_set_text_color(255, 255, 255, 255);
 
     // GPU
+    psvs_gui_set_text_color(74, 232, 130, 255);
     psvs_gui_printf(GUI_ANCHOR_LX(10, 19), GUI_ANCHOR_TY(4, 0), "GPU:");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 27), GUI_ANCHOR_TY(4, 0), "MHz");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 34), GUI_ANCHOR_TY(4, 0), "MB");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 36), GUI_ANCHOR_TY(4, 0), " | ");
+    psvs_gui_set_text_color(255, 255, 255, 255);
+    psvs_gui_printf(GUI_ANCHOR_LX(12, 27), GUI_ANCHOR_TY(4, 0), "MHz");
+    psvs_gui_printf(GUI_ANCHOR_LX(12, 34), GUI_ANCHOR_TY(4, 0), "MB");
+    psvs_gui_set_text_color(196, 155, 207, 255);
+    psvs_gui_printf(GUI_ANCHOR_LX(12, 36), GUI_ANCHOR_TY(4, 0), " | ");
+    psvs_gui_set_text_color(255, 255, 255, 255);
 
     // CPU
+    psvs_gui_set_text_color(116, 217, 252, 255);
     psvs_gui_printf(GUI_ANCHOR_LX(10, 39), GUI_ANCHOR_TY(4, 0), "CPU:");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 47), GUI_ANCHOR_TY(4, 0), "MHz");
+    psvs_gui_set_text_color(255, 255, 255, 255);
+    psvs_gui_printf(GUI_ANCHOR_LX(12, 47), GUI_ANCHOR_TY(4, 0), "MHz");
     psvs_gui_printf(GUI_ANCHOR_LX(10, 54), GUI_ANCHOR_TY(4, 0), "%%");
+    psvs_gui_set_text_color(196, 155, 207, 255);
     psvs_gui_printf(GUI_ANCHOR_LX(10, 55), GUI_ANCHOR_TY(4, 0), " | ");
+    psvs_gui_set_text_color(255, 255, 255, 255);
 
     // RAM:
+    psvs_gui_set_text_color(255, 184, 218, 255);
     psvs_gui_printf(GUI_ANCHOR_LX(10, 58), GUI_ANCHOR_TY(4, 0), "RAM:");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 66), GUI_ANCHOR_TY(4, 0), "MB");
-    psvs_gui_printf(GUI_ANCHOR_LX(10, 68), GUI_ANCHOR_TY(4, 0), " | ");
+    psvs_gui_set_text_color(255, 255, 255, 255);
+    psvs_gui_printf(GUI_ANCHOR_LX(12, 66), GUI_ANCHOR_TY(4, 0), "MB");
+    psvs_gui_set_text_color(196, 155, 207, 255);
+    psvs_gui_printf(GUI_ANCHOR_LX(12, 68), GUI_ANCHOR_TY(4, 0), " | ");
+    psvs_gui_set_text_color(255, 255, 255, 255);
 
     // FPS
+    psvs_gui_set_text_color(255, 172, 128, 255);
     psvs_gui_printf(GUI_ANCHOR_LX(10, 71), GUI_ANCHOR_TY(4, 0), "FPS:");
+    psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
 void psvs_gui_draw_osd2_cpu() {
@@ -603,22 +621,22 @@ void psvs_gui_draw_osd2_cpu() {
 
     // Draw peak load
     val = psvs_perf_get_peak();
-    psvs_gui_set_text_color2(psvs_gui_scale_color(val, 0, 100));
+    //psvs_gui_set_text_color2(psvs_gui_scale_color(val, 0, 100));
     psvs_gui_printf(GUI_ANCHOR_LX(10, 51), GUI_ANCHOR_TY(4, 0), "%3d", val);
 
     // Draw cpu freq
     val = psvs_oc_get_freq(PSVS_OC_DEVICE_CPU);
-    psvs_gui_set_text_color2(psvs_gui_scale_color(val, 41, 500));
+    //psvs_gui_set_text_color2(psvs_gui_scale_color(val, 41, 500));
     psvs_gui_printf(GUI_ANCHOR_LX(10, 44), GUI_ANCHOR_TY(4, 0), "%3d", val);
 
-    psvs_gui_set_text_color(255, 255, 255, 255);
+    //psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
 void psvs_gui_draw_osd2_gpu() {
     int val = psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_ES4);
-    psvs_gui_set_text_color2(psvs_gui_scale_color(val, 41, 222));
+    //psvs_gui_set_text_color2(psvs_gui_scale_color(val, 41, 222));
     psvs_gui_printf(GUI_ANCHOR_LX(10, 24), GUI_ANCHOR_TY(4, 0), "%3d", val);
-    psvs_gui_set_text_color(255, 255, 255, 255);
+    //psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
 void psvs_gui_draw_osd2_batt() {
@@ -630,36 +648,35 @@ void psvs_gui_draw_osd2_batt() {
     g_gui_lazydraw_batt = false;
 
     // Draw battery percentage
-    rgba_t color = psvs_gui_scale_color(60 - batt->percent, 0, 100);
-    psvs_gui_set_text_color2(color);
+    //rgba_t color = psvs_gui_scale_color(60 - batt->percent, 0, 100);
+    //psvs_gui_set_text_color2(color);
     psvs_gui_printf(GUI_ANCHOR_LX(10, 6), GUI_ANCHOR_TY(4, 0), "%3d", batt->percent);
+    
+    //color = psvs_gui_scale_color(batt->power_cons, 500, 5000);
+    //psvs_gui_set_text_color2(color);
+
+    int watts = batt->power_cons / 1000;
+    int watts_decimal = (abs(batt->power_cons) - watts * 1000) / 100;
 
     // Draw system power consumption
-    if (abs(batt->power_cons) < 10000) {
-        color = psvs_gui_scale_color(batt->power_cons, 500, 5000);
-        psvs_gui_set_text_color2(color);
-
-        int watts = batt->power_cons / 1000;
-        int watts_decimal = (abs(batt->power_cons) - watts * 1000) / 100;
-
-        int len = 3 + (watts < 0) + (watts >= 10);
+    if (abs(watts) < 10) {
+        int len = 3 + (watts >= 10);
 
         psvs_gui_printf(GUI_ANCHOR_LX(10, 14 - len), GUI_ANCHOR_TY(4, 0), "%2d.%d", watts, watts_decimal);
     }
-    else {
-        psvs_gui_set_text_color(0, 255, 0, 255);
-        psvs_gui_printf(GUI_ANCHOR_LX(10, 11), GUI_ANCHOR_TY(4, 0), "0.0");
+    else if (abs(watts) < 100) {
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 11), GUI_ANCHOR_TY(4, 0), "%3d", watts);
     }
-    psvs_gui_set_text_color(255, 255, 255, 255);
+    //psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
 void psvs_gui_draw_osd2_fps() {
     int fps = psvs_perf_get_fps();
 
-    psvs_gui_set_text_color2(psvs_gui_scale_color(30 - fps, 0, 30));
+    //psvs_gui_set_text_color2(psvs_gui_scale_color(30 - fps, 0, 30));
     psvs_gui_printf(GUI_ANCHOR_LX(10, 75), GUI_ANCHOR_TY(4, 0), "%3d", fps);
 
-    psvs_gui_set_text_color(255, 255, 255, 255);
+    //psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
 void psvs_gui_draw_osd2_mem() {
@@ -673,11 +690,11 @@ void psvs_gui_draw_osd2_mem() {
     int used_ram = (mem->main_total - mem->main_free) / (1024 * 1024);
     int used_vram = (mem->cdram_total - mem->cdram_free) / (1024 * 1024);
 
-    psvs_gui_set_text_color2(psvs_gui_scale_color(used_vram, 0, 128));
+    //psvs_gui_set_text_color2(psvs_gui_scale_color(used_vram, 0, 128));
     psvs_gui_printf(GUI_ANCHOR_LX(10, 31), GUI_ANCHOR_TY(4, 0), "%3d", used_vram);
-    psvs_gui_set_text_color2(psvs_gui_scale_color(used_ram, 0, 512));
+    //psvs_gui_set_text_color2(psvs_gui_scale_color(used_ram, 0, 512));
     psvs_gui_printf(GUI_ANCHOR_LX(10, 63), GUI_ANCHOR_TY(4, 0), "%3d", used_ram);
-    psvs_gui_set_text_color(255, 255, 255, 255);
+    //psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
 // Full mode
