@@ -3,7 +3,7 @@ Yet another overclocking plugin
 
 ## Features:
 - Allows you to change CPU, GPU, BUS and XBAR clocks separately, in these steps:
-  - **CPU:** 41, 83, 111, 141, 166, 195, 222, 250, 271, 306, 333, 361, 389, 416, 444, 468, 500 MHz
+  - **CPU:** 41, 83, 111, 126, 136, 141, 153, 166, 173, 181, 195, 209, 222, 230, 250, 271, 282, 292, 306, 313, 333, 344, 361, 375, 389, 406, 416, 437, 444, 468, 500 MHz
   - **GPU (ES4):** 41, 55, 83, 111, 166, 222 MHz
   - **BUS:** 55, 83, 111, 166, 222 MHz
   - **XBAR:** 83, 111, 166 MHz
@@ -30,8 +30,8 @@ Yet another overclocking plugin
   - **Auto freq.** - the plugin will use your specified power plan. **(Do not use in LiveArea to avoid crashes)**
     - press **LEFT/RIGHT** to immediately change the max frequency. This frequency won't be surpassed.
     - press **LEFT TRIGGER/RIGHT TRIGGER** immediately change the power plan.
-      - **Power Saving** (GREEN) - Less agressive power plan. Ideal for less demanding apps. 
-      - **Balanced** (YELLOW) - Balanced power plan. 
+      - **Power Saving** (GREEN) - Less agressive power plan. Ideal for less demanding apps.
+      - **Balanced** (YELLOW) - Balanced power plan.
       - **Performance** (RED) - Most agressive power plan. Best suited for demanding games.
 - Press **X** when **> save profile <** is selected to save/delete profiles
   - All **Manual freq.** (BLUE) will be loaded and applied next time you start/resume the game

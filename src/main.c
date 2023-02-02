@@ -9,29 +9,32 @@
 #include "gui.h"
 #include "perf.h"
 #include "profile.h"
+#include "power.h"
 
 int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintptr_t *addr);
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
 bool ksceAppMgrIsExclusiveProcessRunning();
-//bool ksceSblAimgrIsGenuineDolce();
+int ksceSblAimgrIsGenuineDolce();
+int ksceSblACMgrIsPspEmu(SceUID pid);
+int ksceSblACMgrIsSceShell(SceUID pid);
 
 #define PSVS_MAX_HOOKS 18
 static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
 static SceUID         g_hooks[PSVS_MAX_HOOKS];
 static SceUID         g_injects[1];
 
+#define PSVS_NUM_THREADS 2
 static SceUID g_mutex_cpufreq_uid = -1;
 static SceUID g_mutex_procevent_uid = -1;
-static SceUID g_thread_uid = -1;
+static SceUID g_mutex_framebuf_uid = -1;
+static SceUID g_thread_uid[] = { -1, -1 };
 static bool   g_thread_run = true;
 
 SceUID g_pid = INVALID_PID;
+psvs_app_t g_app = PSVS_APP_SCESHELL;
 char g_titleid[32] = "";
-bool g_is_in_pspemu = false;
-bool g_is_dolce = false;
 
-SceUID (*_ksceKernelGetProcessMainModule)(SceUID pid);
-int (*_ksceKernelGetModuleInfo)(SceUID pid, SceUID modid, SceKernelModuleInfo *info);
+bool g_is_dolce = false;
 
 int (*SceSysmemForKernel_0x3650963F)(uint32_t a1, SceSysmemAddressSpaceInfo *a2);
 int (*SceThreadmgrForDriver_0x7E280B69)(SceKernelSystemInfo *pInfo);
@@ -53,7 +56,7 @@ int (*_kscePowerSetGpuXbarClockFrequency)(int freq);
 
 static void psvs_input_check(SceCtrlData *pad_data, int count) {
     // Do not pass input to fg app
-    if (psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
+    if (g_app != PSVS_APP_BLACKLIST && psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
         SceCtrlData kctrl;
         kctrl.buttons = 0;
         for (int i = 0; i < count; i++)
@@ -62,33 +65,56 @@ static void psvs_input_check(SceCtrlData *pad_data, int count) {
 }
 
 int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplayFrameBuf *pParam, int sync) {
-    if (!head || !pParam)
+    if (sync == PSVS_FRAMEBUF_HOOK_MAGIC) {
+        sync = 1;
+        goto DISPLAY_HOOK_RET;
+    }
+
+    if (head != ksceDisplayGetPrimaryHead() || !pParam || !pParam->base)
         goto DISPLAY_HOOK_RET;
 
-    if (g_is_in_pspemu)
+    if (g_app == PSVS_APP_BLACKLIST)
         goto DISPLAY_HOOK_RET;
 
-    if (index && ksceAppMgrIsExclusiveProcessRunning())
+    if (!index && g_app == PSVS_APP_SCESHELL)
+        goto DISPLAY_HOOK_RET; // Do not draw on i0 in SceShell
+
+    if (index && (ksceAppMgrIsExclusiveProcessRunning() || g_app == PSVS_APP_GAME || g_app == PSVS_APP_SYSTEM_XCL))
         goto DISPLAY_HOOK_RET; // Do not draw over SceShell overlay
 
     psvs_gui_mode_t mode = psvs_gui_get_mode();
     if (mode == PSVS_GUI_MODE_HIDDEN)
         goto DISPLAY_HOOK_RET;
 
-    psvs_perf_calc_fps();
-    psvs_gui_set_framebuf(pParam);
+    int ret = ksceKernelLockMutex(g_mutex_framebuf_uid, 1, NULL);
+    if (ret < 0)
+        goto DISPLAY_HOOK_RET;
 
-    if (mode == PSVS_GUI_MODE_FULL) {
+    psvs_perf_calc_fps();
+
+    if (mode == PSVS_GUI_MODE_FULL || mode == PSVS_GUI_MODE_OSD2)
         psvs_perf_poll_memory();
-    }
+
+    psvs_gui_set_framebuf(pParam);
 
     if (mode == PSVS_GUI_MODE_FPS || mode == PSVS_GUI_MODE_FULL) {
         psvs_gui_dd_fps(); // draw fps onto fb
     }
 
-    if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
+    if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_OSD2 || mode == PSVS_GUI_MODE_FULL) {
         psvs_gui_cpy(); // cpy from buffer
+
+        if (sync && mode == PSVS_GUI_MODE_FULL && g_app != PSVS_APP_SCESHELL && g_app != PSVS_APP_SYSTEM) {
+            // update now to fix flicker when vblank period is missed
+            ksceKernelUnlockMutex(g_mutex_framebuf_uid, 1);
+
+            int ret = TAI_CONTINUE(int, g_hookrefs[0], head, index, pParam, 0);
+            ret = ksceDisplaySetFrameBufInternal(head, index, pParam, PSVS_FRAMEBUF_HOOK_MAGIC);
+            return ret;
+        }
     }
+
+    ksceKernelUnlockMutex(g_mutex_framebuf_uid, 1);
 
 DISPLAY_HOOK_RET:
     return TAI_CONTINUE(int, g_hookrefs[0], head, index, pParam, sync);
@@ -141,8 +167,38 @@ DECL_FUNC_HOOK_PATCH_FREQ_GETTER(15, scePowerGetBusClockFrequency,     PSVS_OC_D
 DECL_FUNC_HOOK_PATCH_FREQ_GETTER(16, scePowerGetGpuClockFrequency,     PSVS_OC_DEVICE_GPU_ES4)
 DECL_FUNC_HOOK_PATCH_FREQ_GETTER(17, scePowerGetGpuXbarClockFrequency, PSVS_OC_DEVICE_GPU_XBAR)
 
+static psvs_app_t _psvs_get_app_type(int pid, const char *titleid) {
+    psvs_app_t app = PSVS_APP_MAX;
+
+    if (ksceSblACMgrIsPspEmu(pid)) {
+        app = PSVS_APP_BLACKLIST;
+    } else if (!strncmp(titleid, "NPXS", 4)) {
+        app = PSVS_APP_SYSTEM;
+
+        // TODO: Figure out a way to do this on the fly
+
+        if (!strncmp(&titleid[4], "10079", 5) ||     // Daily Checker BG
+                !strncmp(&titleid[4], "10063", 5)) { // MsgMW
+            app = PSVS_APP_MAX; // not an app
+        } else if (!strncmp(&titleid[4], "10007", 5) || // Welcome Park
+                   !strncmp(&titleid[4], "10010", 5) || // Videos
+                   !strncmp(&titleid[4], "10026", 5) || // Content Manager
+                   !strncmp(&titleid[4], "10095", 5)) { // Panoramic Camera
+            app = PSVS_APP_SYSTEM_XCL; // exclusive
+        }
+    } else if (ksceSblACMgrIsSceShell(pid) && !strncmp(titleid, "main", 4)) {
+        app = PSVS_APP_SCESHELL;
+    } else {
+        app = PSVS_APP_GAME;
+    }
+
+    return app;
+}
+
 int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, int *a5, int a6) {
     char titleid[sizeof(g_titleid)];
+    psvs_app_t app = PSVS_APP_SCESHELL;
+
     int ret = ksceKernelLockMutex(g_mutex_procevent_uid, 1, NULL);
     if (ret < 0)
         goto PROCEVENT_EXIT;
@@ -150,50 +206,44 @@ int ksceKernelInvokeProcEventHandler_patched(int pid, int ev, int a3, int a4, in
     switch (ev) {
         case 1: // startup
         case 5: // resume
-            // Ignore startup events if exclusive proc is already running
-            if (ksceAppMgrIsExclusiveProcessRunning()
-                    && strncmp(g_titleid, "main", 4) != 0)
+            // Ignore startup events if non-SceShell app is running
+            if (g_app != PSVS_APP_SCESHELL)
                 goto PROCEVENT_UNLOCK_EXIT;
-
-            // Check if pid is PspEmu
-            SceKernelModuleInfo info;
-            info.size = sizeof(SceKernelModuleInfo);
-            _ksceKernelGetModuleInfo(pid, _ksceKernelGetProcessMainModule(pid), &info);
-            if (!strncmp(info.module_name, "ScePspemu", 9)) {
-                g_is_in_pspemu = true;
-                snprintf(titleid, sizeof(titleid), "ScePspemu");
-                break;
-            }
 
             // Check titleid
             ksceKernelGetProcessTitleId(pid, titleid, sizeof(titleid));
-            if (!strncmp(titleid, "NPXS", 4))
+
+            // Check app type
+            app = _psvs_get_app_type(pid, titleid);
+            if (app == PSVS_APP_MAX) // not an app
                 goto PROCEVENT_UNLOCK_EXIT;
 
             break;
 
         case 3: // exit
         case 4: // suspend
-            // Check titleid
-            ksceKernelGetProcessTitleId(pid, titleid, sizeof(titleid));
-            if (!strncmp(titleid, "NPXS", 4))
+            if (g_pid != pid)
                 goto PROCEVENT_UNLOCK_EXIT;
 
-            g_is_in_pspemu = false;
+            app = PSVS_APP_SCESHELL;
             snprintf(titleid, sizeof(titleid), "main");
             break;
     }
 
     if (ev == 1 || ev == 5 || ev == 3 || ev == 4) {
         if (strncmp(g_titleid, titleid, sizeof(g_titleid))) {
+            // Set titleid
             strncpy(g_titleid, titleid, sizeof(g_titleid));
 
-            // Set current pid
+            // Set pid
             g_pid = (ev == 1 || ev == 5) ? pid : INVALID_PID;
 
-            // Load profile if app changed
-            if (g_is_in_pspemu || !psvs_profile_load()) {
-                // If no profile exists or in PspEmu,
+            // Set type
+            g_app = app;
+
+            // Load profile
+            if (g_app == PSVS_APP_BLACKLIST || !psvs_profile_load()) {
+                // If no profile exists or in blacklisted app,
                 // reset all options to default
                 psvs_oc_init();
             }
@@ -207,11 +257,10 @@ PROCEVENT_EXIT:
     return TAI_CONTINUE(int, g_hookrefs[13], pid, ev, a3, a4, a5, a6);
 }
 
-static int psvs_thread(SceSize args, void *argp) {
-    int counter = 0;
+static int psvs_gui_thread(SceSize args, void *argp) {
     while (g_thread_run) {
-        if (g_is_in_pspemu) {
-            // Don't do anything if PspEmu is running
+        if (g_app == PSVS_APP_BLACKLIST) {
+            // Don't do anything if blacklisted app is running
             ksceKernelDelayThread(200 * 1000);
             continue;
         }
@@ -228,30 +277,21 @@ static int psvs_thread(SceSize args, void *argp) {
         psvs_gui_mode_t mode = psvs_gui_get_mode();
 
         // If in OSD/FULL mode, poll shown info
-        if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_FULL) {
-            psvs_perf_poll_cpu();
+        if (mode == PSVS_GUI_MODE_OSD || mode == PSVS_GUI_MODE_OSD2 || mode == PSVS_GUI_MODE_FULL) {
+            if(psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) != PSVS_OC_MODE_AUTO) 
+                psvs_perf_poll_cpu(PSVS_POWER_PLAN_MAX);
             psvs_perf_poll_batt();
         }
-        
-        // Compute dynamic cpu freq if auto mode is selected
-        if (psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) == PSVS_OC_MODE_AUTO) {
-            if (psvs_oc_check_raise_freq(PSVS_OC_DEVICE_CPU)) {
-                psvs_oc_change(PSVS_OC_DEVICE_CPU, true);
-                counter = 0;
-            }
-            if (psvs_oc_check_lower_freq(PSVS_OC_DEVICE_CPU) && counter >= 10) {
-                psvs_oc_change(PSVS_OC_DEVICE_CPU, false);
-                counter = 0;
-            }
-            // Add time space between freq shift when lowering freq
-            if (counter < 10)
-                counter++;
-        }
+
+        // Measure system power consumption
+        psvs_perf_compute_power();
 
         // Redraw buffer template on gui mode or fb change
         if (fb_or_mode_changed) {
             if (mode == PSVS_GUI_MODE_OSD) {
                 psvs_gui_draw_osd_template();
+            } else if (mode == PSVS_GUI_MODE_OSD2) {
+                psvs_gui_draw_osd2_template();
             } else if (mode == PSVS_GUI_MODE_FULL) {
                 psvs_gui_draw_template();
             }
@@ -264,8 +304,17 @@ static int psvs_thread(SceSize args, void *argp) {
             psvs_gui_draw_osd_batt();
         }
 
+        // Draw OSD2 mode
+        else if (mode == PSVS_GUI_MODE_OSD2) {
+            psvs_gui_draw_osd2_cpu();
+            psvs_gui_draw_osd2_gpu();
+            psvs_gui_draw_osd2_mem();
+            psvs_gui_draw_osd2_fps();
+            psvs_gui_draw_osd2_batt();
+        }
+
         // Draw FULL mode
-        if (mode == PSVS_GUI_MODE_FULL) {
+        else if (mode == PSVS_GUI_MODE_FULL) {
             psvs_gui_draw_header();
             psvs_gui_draw_batt_section();
             psvs_gui_draw_cpu_section();
@@ -274,6 +323,38 @@ static int psvs_thread(SceSize args, void *argp) {
         }
 
         ksceKernelDelayThread(50 * 1000);
+    }
+
+    return 0;
+}
+
+static int psvs_auto_clocks_thread(SceSize args, void *argp) {
+    uint8_t counter = 0;
+    const uint8_t min_lower_counter_value = 25;
+    const uint8_t min_raise_counter_value = 3;
+    while (g_thread_run) {
+        if (g_app == PSVS_APP_BLACKLIST || psvs_oc_get_mode(PSVS_OC_DEVICE_CPU) != PSVS_OC_MODE_AUTO) {
+            // Don't do anything if blacklisted app is running
+            ksceKernelDelayThread(200 * 1000);
+            continue;
+        }
+
+        // Poll cpu information to perform clocks control
+        psvs_perf_poll_cpu(psvs_oc_get_power_plan(PSVS_OC_DEVICE_CPU));
+        
+        // Compute dynamic cpu freq if auto mode is selected
+        if (psvs_oc_check_raise_freq(PSVS_OC_DEVICE_CPU) && counter >= min_raise_counter_value) {
+            psvs_oc_change(PSVS_OC_DEVICE_CPU, true);
+            counter = 0;
+        }
+        if (psvs_oc_check_lower_freq(PSVS_OC_DEVICE_CPU) && counter >= min_lower_counter_value) {
+            psvs_oc_change(PSVS_OC_DEVICE_CPU, false);
+            counter /= 2;
+        }
+        
+        if (counter < min_lower_counter_value) 
+            counter++;
+        ksceKernelDelayThread(20 * 1000);
     }
 
     return 0;
@@ -317,6 +398,7 @@ int module_start(SceSize argc, const void *args) {
 
     g_mutex_cpufreq_uid = ksceKernelCreateMutex("psvs_mutex_cpufreq", 0, 0, NULL);
     g_mutex_procevent_uid = ksceKernelCreateMutex("psvs_mutex_procevent", 0, 0, NULL);
+    g_mutex_framebuf_uid = ksceKernelCreateMutex("psvs_mutex_framebuf", 0, 0, NULL);
 
     psvs_oc_init(); // reset profile options to default
 
@@ -362,19 +444,6 @@ int module_start(SceSize argc, const void *args) {
             "ScePower", 0x1082DA7F, 0x0A750DEE, scePowerGetGpuXbarClockFrequency_patched);
 
     ret = module_get_export_func(KERNEL_PID,
-            "SceKernelModulemgr", 0xC445FA63, 0x20A27FA9, (uintptr_t *)&_ksceKernelGetProcessMainModule); // 3.60
-    if (ret < 0) {
-        module_get_export_func(KERNEL_PID,
-            "SceKernelModulemgr", 0x92C9FFC2, 0x679F5144, (uintptr_t *)&_ksceKernelGetProcessMainModule); // 3.65
-    }
-    ret = module_get_export_func(KERNEL_PID,
-            "SceKernelModulemgr", 0xC445FA63, 0xD269F915, (uintptr_t *)&_ksceKernelGetModuleInfo); // 3.60
-    if (ret < 0) {
-        module_get_export_func(KERNEL_PID,
-            "SceKernelModulemgr", 0x92C9FFC2, 0xDAA90093, (uintptr_t *)&_ksceKernelGetModuleInfo); // 3.65
-    }
-
-    ret = module_get_export_func(KERNEL_PID,
             "SceSysmem", 0x63A519E5, 0x3650963F, (uintptr_t *)&SceSysmemForKernel_0x3650963F); // 3.60
     if (ret < 0) {
         module_get_export_func(KERNEL_PID,
@@ -393,17 +462,24 @@ int module_start(SceSize argc, const void *args) {
     snprintf(g_titleid, sizeof(g_titleid), "main");
     psvs_profile_load();
 
-    g_thread_uid = ksceKernelCreateThread("psvs_thread", psvs_thread, 0x3C, 0x3000, 0, 0x10000, 0);
-    ksceKernelStartThread(g_thread_uid, 0, NULL);
+    // Init variables for power measurement
+    psvs_perf_init_power_meter();
+
+    g_thread_uid[0] = ksceKernelCreateThread("psvs_gui_thread", psvs_gui_thread, 0x3C, 0x3000, 0, 0x10000, 0);
+    g_thread_uid[1] = ksceKernelCreateThread("psvs_auto_clocks_thread", psvs_auto_clocks_thread, 0x3B, 0x2000, 0, 0x10000, 0);
+    ksceKernelStartThread(g_thread_uid[0], 0, NULL);
+    ksceKernelStartThread(g_thread_uid[1], 0, NULL);
 
     return SCE_KERNEL_START_SUCCESS;
 }
 
 int module_stop(SceSize argc, const void *args) {
-    if (g_thread_uid >= 0) {
-        g_thread_run = 0;
-        ksceKernelWaitThreadEnd(g_thread_uid, NULL, NULL);
-        ksceKernelDeleteThread(g_thread_uid);
+    for(uint i = 0; i < PSVS_NUM_THREADS; i++) {
+        if (g_thread_uid[i] >= 0) {
+            g_thread_run = 0;
+            ksceKernelWaitThreadEnd(g_thread_uid[i], NULL, NULL);
+            ksceKernelDeleteThread(g_thread_uid[i]);
+        }
     }
 
     for (int i = 0; i < PSVS_MAX_HOOKS; i++) {
@@ -418,6 +494,8 @@ int module_stop(SceSize argc, const void *args) {
         ksceKernelDeleteMutex(g_mutex_cpufreq_uid);
     if (g_mutex_procevent_uid >= 0)
         ksceKernelDeleteMutex(g_mutex_procevent_uid);
+    if (g_mutex_framebuf_uid >= 0)
+        ksceKernelDeleteMutex(g_mutex_framebuf_uid);
 
     psvs_gui_deinit();
 

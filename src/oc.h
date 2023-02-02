@@ -1,8 +1,8 @@
 #ifndef _OC_H_
 #define _OC_H_
 
-#define PSVS_OC_MAX_FREQ_N 20
-#define PSVS_OC_CPU_MIN_FREQ 83
+#define PSVS_OC_MAX_FREQ_N 31
+#define PSVS_OC_CPU_MIN_FREQ 111
 
 #define PSVS_OC_DECL_SETTER(fun) \
     static int _##fun(int freq) { return fun(freq); }

@@ -5,7 +5,10 @@
 #define GUI_WIDTH  308
 #define GUI_HEIGHT 344
 
-#define GUI_OSD_HEIGHT 64
+#define GUI_OSD2_WIDTH 960
+
+#define GUI_OSD_HEIGHT 96
+#define GUI_OSD2_HEIGHT 32
 
 #define GUI_BATT_SIZE_W 32
 #define GUI_BATT_SIZE_H 16
@@ -25,8 +28,8 @@
 #define GUI_ANCHOR_CX2(len, scale) (GUI_WIDTH / 2 - ((len) * GUI_FONT_W * (scale)) / 2)
 #define GUI_ANCHOR_CY(lines) (GUI_HEIGHT / 2 - ((lines) * GUI_FONT_H) / 2)
 
-#define GUI_RESCALE_X(x) (int)((x) * g_gui_fb_w_ratio)
-#define GUI_RESCALE_Y(y) (int)((y) * g_gui_fb_h_ratio)
+#define GUI_RESCALE_X(x) (int)((x) * (g_gui_fb_w_ratio > 1.0f ? 1.0f : g_gui_fb_w_ratio))
+#define GUI_RESCALE_Y(y) (int)((y) * (g_gui_fb_h_ratio > 1.0f ? 1.0f : g_gui_fb_h_ratio))
 
 #define GUI_GLOBAL_PROFILE_BUTTON_MOD SCE_CTRL_LTRIGGER
 
@@ -45,6 +48,7 @@ typedef enum {
     PSVS_GUI_MODE_FULL,
     PSVS_GUI_MODE_FPS,
     PSVS_GUI_MODE_OSD,
+    PSVS_GUI_MODE_OSD2,
     PSVS_GUI_MODE_MAX
 } psvs_gui_mode_t;
 
@@ -84,6 +88,13 @@ void psvs_gui_draw_osd_template();
 void psvs_gui_draw_osd_cpu();
 void psvs_gui_draw_osd_fps();
 void psvs_gui_draw_osd_batt();
+
+void psvs_gui_draw_osd2_template();
+void psvs_gui_draw_osd2_cpu();
+void psvs_gui_draw_osd2_gpu();
+void psvs_gui_draw_osd2_fps();
+void psvs_gui_draw_osd2_batt();
+void psvs_gui_draw_osd2_mem();
 
 void psvs_gui_draw_template();
 void psvs_gui_draw_header();

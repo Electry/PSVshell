@@ -2,6 +2,7 @@
 #include <taihen.h>
 #include <stdbool.h>
 
+#include "power.h"
 #include "main.h"
 
 SceUInt32 ksceKernelGetProcessTimeLowCore();
@@ -14,10 +15,12 @@ SceUInt32 ksceKernelSysrootGetCurrentAddressSpaceCB();
 static int g_perf_peak_usage_samples[PSVS_PERF_PEAK_SAMPLES] = {0};
 static int g_perf_peak_usage_rotation = 0;
 static int g_perf_usage[4] = {0, 0, 0, 0};
+static int g_peak_smooth_usage = 50;
 
-static SceUInt32 g_perf_tick_last = 0; // AVG CPU load
-static SceUInt32 g_perf_tick_q_last = 0; // Peak CPU load
-static SceUInt32 g_perf_tick_fps_last = 0; // Framerate
+static SceUInt32 g_perf_tick_last = 0;      // AVG CPU load
+static SceUInt32 g_perf_tick_q_last = 0;    // Peak CPU load
+static SceUInt32 g_perf_tick_fps_last = 0;  // Framerate
+static SceUInt32 g_perf_tick_power_last = 0;    // Power consumption
 
 static SceKernelSysClock g_perf_idle_clock_last[4] = {0, 0, 0, 0};
 static SceKernelSysClock g_perf_idle_clock_q_last[4] = {0, 0, 0, 0};
@@ -30,8 +33,20 @@ static uint32_t g_perf_frametime_sum = 0;
 static uint8_t g_perf_frametime_n = 0;
 static int g_perf_fps = 0;
 
+static int g_perf_batt_capacity_last;
+
 int psvs_perf_get_fps() {
     return g_perf_fps;
+}
+
+int psvs_perf_get_fps_cap()
+{
+    if (g_perf_fps <= 31)
+        return PSVS_PERF_FPS_30;
+    else if (g_perf_fps <= 61)
+        return PSVS_PERF_FPS_60;
+    else   
+        return PSVS_PERF_FPS_UNCAP;
 }
 
 int psvs_perf_get_load(int core) {
@@ -43,6 +58,10 @@ int psvs_perf_get_peak() {
     for (int i = 0; i < PSVS_PERF_PEAK_SAMPLES; i++)
         peak_total += g_perf_peak_usage_samples[i];
     return peak_total / PSVS_PERF_PEAK_SAMPLES;
+}
+
+int psvs_perf_get_smooth_peak() {
+    return g_peak_smooth_usage;
 }
 
 psvs_battery_t *psvs_perf_get_batt() {
@@ -70,7 +89,7 @@ void psvs_perf_calc_fps() {
     g_perf_tick_fps_last = tick_now;
 }
 
-void psvs_perf_poll_cpu() {
+void psvs_perf_poll_cpu(int performance_mode) {
     SceUInt32 tick_now = ksceKernelGetProcessTimeLowCore();
     SceUInt32 tick_diff = tick_now - g_perf_tick_last;
     SceUInt32 tick_q_diff = tick_now - g_perf_tick_q_last;
@@ -105,10 +124,30 @@ void psvs_perf_poll_cpu() {
         max_usage = 0;
     if (max_usage > 100)
         max_usage = 100;
+    
     g_perf_peak_usage_samples[g_perf_peak_usage_rotation] = max_usage;
     g_perf_peak_usage_rotation++;
     if (g_perf_peak_usage_rotation >= PSVS_PERF_PEAK_SAMPLES)
         g_perf_peak_usage_rotation = 0; // flip
+
+    // Calculate a smooth peak usage for auto clocks
+    if (performance_mode != PSVS_POWER_PLAN_MAX) {
+        int avg_peak = psvs_perf_get_peak();
+        if (performance_mode == PSVS_POWER_PLAN_SAVER) {
+            g_peak_smooth_usage = avg_peak >= g_peak_smooth_usage ? (avg_peak * 0.03 + g_peak_smooth_usage * 0.97) : 
+                                                                    (avg_peak * 0.1  + g_peak_smooth_usage * 0.9);
+        }
+        else if (performance_mode == PSVS_POWER_PLAN_BALANCED) {
+            g_peak_smooth_usage = avg_peak >= g_peak_smooth_usage ? (avg_peak * 0.05 + g_peak_smooth_usage * 0.95) : 
+                                                                    (avg_peak * 0.05 + g_peak_smooth_usage * 0.95);
+        }
+        else { // PSVS_POWER_PLAN_PERFORMANCE
+            g_peak_smooth_usage = avg_peak >= g_peak_smooth_usage ? (avg_peak * 0.175 + g_peak_smooth_usage * 0.825) : 
+                                                                    (avg_peak * 0.02 + g_peak_smooth_usage * 0.98);
+        }
+
+    }
+
     g_perf_tick_q_last = tick_now;
 }
 
@@ -173,4 +212,38 @@ void psvs_perf_poll_batt() {
     // Grab charger
     bool bval = kscePowerIsBatteryCharging();
     PSVS_CHECK_ASSIGN(g_perf_batt, is_charging, bval);
+}
+
+void psvs_perf_init_power_meter() {
+    g_perf_batt_capacity_last = kscePowerGetBatteryRemainCapacity();
+    g_perf_tick_power_last = ksceKernelGetProcessTimeLowCore();
+    g_perf_batt.power_cons = 0;
+}
+
+void psvs_perf_compute_power() {
+    int measuredCapacity = kscePowerGetBatteryRemainCapacity();
+    if (g_perf_batt_capacity_last != measuredCapacity) {
+        SceUInt32 tick_now = ksceKernelGetProcessTimeLowCore();
+        float elapsed_time = (float)(tick_now - g_perf_tick_power_last) / (float)SECOND;
+        
+        // Check elapsed_time to avoid crash (posible division by 0 or a really small number)
+        if (elapsed_time >= 5.0f) {
+            int milli_watts = (int) (abs(measuredCapacity - g_perf_batt_capacity_last) * kscePowerGetBatteryVolt() * 0.001f / (elapsed_time / 3600.0f));
+            //double wattsHour = (abs(measuredCapacity - g_perf_batt_capacity_last) * scePowerGetBatteryVolt() * 0.001);
+
+            milli_watts = g_perf_batt.is_charging ? -milli_watts : milli_watts;
+
+            PSVS_CHECK_ASSIGN(g_perf_batt, power_cons, milli_watts);
+                
+            g_perf_batt_capacity_last = measuredCapacity;
+            g_perf_tick_power_last = ksceKernelGetProcessTimeLowCore();
+        }
+    }
+}
+
+void psvs_perf_reset_peak(bool raise)
+{
+    g_peak_smooth_usage = (int) ((raise ? g_peak_smooth_usage * 0.93f : g_peak_smooth_usage * 1.07f) + 0.5f);
+    for (uint8_t i = 0; i < PSVS_PERF_PEAK_SAMPLES; i++)
+        g_perf_peak_usage_samples[i] = g_peak_smooth_usage;
 }
