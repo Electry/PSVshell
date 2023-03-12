@@ -16,13 +16,15 @@
 #define GUI_FONT_W 12
 #define GUI_FONT_H 24
 
-#define GUI_ANCHOR_LX(off, len) (off + (len) * GUI_FONT_W)
-#define GUI_ANCHOR_RX(off, len) (GUI_WIDTH - (off) - (len) * GUI_FONT_W)
-#define GUI_ANCHOR_RX2(off, len, scale) (GUI_WIDTH - (off) - (len) * GUI_FONT_W * (scale))
+#define GUI_BURN_OFF 3
 
-#define GUI_ANCHOR_TY(off, lines) (off + (lines) * GUI_FONT_H)
-#define GUI_ANCHOR_BY(off, lines) (GUI_HEIGHT - (off) - (lines) * GUI_FONT_H)
-#define GUI_ANCHOR_BY2(off, lines, scale) (GUI_HEIGHT - (off) - (lines) * GUI_FONT_H * (scale))
+#define GUI_ANCHOR_LX(off, len) (off + burn_off_x + (len) * GUI_FONT_W)
+#define GUI_ANCHOR_RX(off, len) (GUI_WIDTH - (off + burn_off_x) - (len) * GUI_FONT_W)
+#define GUI_ANCHOR_RX2(off, len, scale) (GUI_WIDTH - (off + burn_off_x) - (len) * GUI_FONT_W * (scale))
+
+#define GUI_ANCHOR_TY(off, lines) (off + burn_off_y + (lines) * GUI_FONT_H)
+#define GUI_ANCHOR_BY(off, lines) (GUI_HEIGHT - (off + burn_off_y) - (lines) * GUI_FONT_H)
+#define GUI_ANCHOR_BY2(off, lines, scale) (GUI_HEIGHT - (off + burn_off_y) - (lines) * GUI_FONT_H * (scale))
 
 #define GUI_ANCHOR_CX(len) (GUI_WIDTH / 2 - ((len) * GUI_FONT_W) / 2)
 #define GUI_ANCHOR_CX2(len, scale) (GUI_WIDTH / 2 - ((len) * GUI_FONT_W * (scale)) / 2)
@@ -106,5 +108,7 @@ void psvs_gui_draw_menu();
 int psvs_gui_init();
 void psvs_gui_deinit();
 void psvs_gui_cpy();
+
+void psvs_gui_change_bunr_off();
 
 #endif

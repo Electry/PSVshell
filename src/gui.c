@@ -29,6 +29,9 @@ static float g_gui_fb_h_ratio = 1.0f;
 static int g_gui_width = GUI_WIDTH;
 static int g_gui_height = GUI_HEIGHT;
 
+static uint8_t burn_off_x = 0;
+static uint8_t burn_off_y = 0;
+
 static rgba_t *g_gui_buffer;
 static SceUID g_gui_buffer_uid = -1;
 
@@ -567,7 +570,8 @@ void psvs_gui_draw_osd_fps() {
 // OSD2 mode
 
 void psvs_gui_draw_osd2_template() {
-    psvs_gui_set_back_color(50, 50, 50, 255);
+    //psvs_gui_set_back_color(50, 50, 50, 255);
+    psvs_gui_set_back_color(0, 0, 0, 255);  // Black background to avoid OLED burn
     psvs_gui_set_text_color(255, 255, 255, 255);
     psvs_gui_clear();
 
@@ -987,4 +991,13 @@ void psvs_gui_cpy() {
     }
 
     DACR_RESET(dacr);
+}
+
+void psvs_gui_change_bunr_off()
+{
+    burn_off_y = (burn_off_x + burn_off_y) % (GUI_BURN_OFF * 2);
+    burn_off_x = GUI_BURN_OFF - burn_off_x;
+
+    g_gui_lazydraw_memusage = true;
+    g_gui_lazydraw_batt = true;
 }

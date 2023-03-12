@@ -258,6 +258,8 @@ PROCEVENT_EXIT:
 }
 
 static int psvs_gui_thread(SceSize args, void *argp) {
+    uint32_t burn_off_counter = 0;
+
     while (g_thread_run) {
         if (g_app == PSVS_APP_BLACKLIST) {
             // Don't do anything if blacklisted app is running
@@ -285,6 +287,22 @@ static int psvs_gui_thread(SceSize args, void *argp) {
 
         // Measure system power consumption
         psvs_perf_compute_power();
+
+        // Move text to avoid OLED burn every 5 mins (6000 * 50 ms = 300000 ms = 300 s = 5 mins)
+        if (burn_off_counter >= 6000)
+        {
+            psvs_gui_change_bunr_off();
+
+            if (mode == PSVS_GUI_MODE_OSD) {
+                psvs_gui_draw_osd_template();
+            } else if (mode == PSVS_GUI_MODE_OSD2) {
+                psvs_gui_draw_osd2_template();
+            } else if (mode == PSVS_GUI_MODE_FULL) {
+                psvs_gui_draw_template();
+            }
+            
+            burn_off_counter = 0;
+        }
 
         // Redraw buffer template on gui mode or fb change
         if (fb_or_mode_changed) {
@@ -321,6 +339,8 @@ static int psvs_gui_thread(SceSize args, void *argp) {
             psvs_gui_draw_memory_section();
             psvs_gui_draw_menu();
         }
+
+        burn_off_counter++;
 
         ksceKernelDelayThread(50 * 1000);
     }
