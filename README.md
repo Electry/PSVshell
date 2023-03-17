@@ -3,7 +3,7 @@ Yet another overclocking plugin
 
 ## Features:
 - Allows you to change CPU, GPU, BUS and XBAR clocks separately, in these steps:
-  - **CPU:** 41, 83, 111, 126, 136, 141, 153, 166, 173, 181, 195, 209, 222, 230, 250, 271, 282, 292, 306, 313, 333, 344, 361, 375, 389, 406, 416, 437, 444, 468, 500 MHz
+  - **CPU:** 41, 83, 111, 126, 147, 166, 181, 209, 222, 251, 292, 333, 389, 444, 468, 500 MHz
   - **GPU (ES4):** 41, 55, 83, 111, 166, 222 MHz
   - **BUS:** 55, 83, 111, 166, 222 MHz
   - **XBAR:** 83, 111, 166 MHz

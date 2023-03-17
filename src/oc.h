@@ -43,7 +43,7 @@ typedef struct {
 
 int psvs_oc_get_freq(psvs_oc_device_t device);
 int psvs_oc_set_freq(psvs_oc_device_t device, int freq);
-void psvs_oc_holy_shit(int freq);
+int psvs_oc_set_cpu_freq(int freq);
 
 int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq);
 int psvs_oc_get_max_freq(psvs_oc_device_t device);
