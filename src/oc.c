@@ -27,7 +27,7 @@ PSVS_OC_DECL_SETTER(_kscePowerSetGpuXbarClockFrequency);
 
 static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
     [PSVS_OC_DEVICE_CPU] = {
-        .freq_n = 31, .freq = {41, 83, 111, 126, 136, 141, 153, 166, 173, 181, 195, 209, 222, 230, 250, 271, 282, 292, 306, 313, 333, 344, 361, 375, 389, 406, 416, 437, 444, 468, 500}, .default_freq = 333,
+        .freq_n = 16, .freq = {41, 83, 111, 126, 147, 166, 181, 209, 222, 251, 292, 333, 389, 444, 468, 500}, .default_freq = 333,
         .get_freq = __kscePowerGetArmClockFrequency,
         .set_freq = __kscePowerSetArmClockFrequency
     },
@@ -65,25 +65,89 @@ int psvs_oc_set_freq(psvs_oc_device_t device, int freq) {
     return g_oc_devopt[device].set_freq(freq);
 }
 
-void psvs_oc_holy_shit(int freq) {
-    if (freq == 468)
-    {
-        // Apply mul:div (15:1)
-        ScePervasiveForDriver_0xE9D95643(15, 16 - 1);
-
-        // Store global freq & mul for kscePowerGetArmClockFrequency()
-        *ScePower_41C8 = 468;
-        *ScePower_41CC = 15;
+// Called from kscePowerSetArmClockFrequency hook
+int psvs_oc_set_cpu_freq(int freq) {
+    int mul, ndiv, ret;
+    switch (freq) {
+    case 41:
+        mul = 1;
+        ndiv = 16;
+        break;
+    case 83:
+        mul = 3;
+        ndiv = 16;
+        break;
+    case 111:
+        mul = 4;
+        ndiv = 16;
+        break;
+    case 126:
+        mul = 5;
+        ndiv = 16 - 4;
+        break;
+    case 147:
+        mul = 5;
+        ndiv = 16 - 2;
+        break;
+    case 166:
+        mul = 5;
+        ndiv = 16;
+        break;
+    case 181:
+        mul = 6;
+        ndiv = 16 - 3;
+        break;
+    case 209:
+        mul = 6;
+        ndiv = 16 - 1;
+        break;
+    case 222:
+        mul = 6;
+        ndiv = 16;
+        break;
+    case 251:
+        mul = 7;
+        ndiv = 16 - 4;
+        break;
+    case 292:
+        mul = 7;
+        ndiv = 16 - 2;
+        break;
+    case 333:
+        mul = 7;
+        ndiv = 16;
+        break;
+    case 389:
+        mul = 8;
+        ndiv = 16 - 2;
+        break;
+    case 444:
+        mul = 8;
+        ndiv = 16;
+        break;
+    case 468:
+        mul = 9;
+        ndiv = 16 - 1;
+        break;
+    case 500:
+        mul = 9;
+        ndiv = 16 - 0;
+        break;
+    default:
+        /**
+         * In this scenario the CPU frequency should have been rounded up to the nearest supported by scePower. 
+         * So a request for 125MHz would be rounded to 166 and so on.
+         */
+        return 0;
     }
-    else 
-    {
-        // Apply mul:div (15:0)
-        ScePervasiveForDriver_0xE9D95643(15, 16 - 0);
 
-        // Store global freq & mul for kscePowerGetArmClockFrequency()
-        *ScePower_41C8 = 500;
-        *ScePower_41CC = 15;
+    ret = ScePervasiveForDriver_0xE9D95643(mul, ndiv);
+    if (ret == 0) {
+        *ScePower_41C8 = freq;
+        *ScePower_41CC = mul;
     }
+
+    return ret;
 }
 
 int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq) {
