@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.15)
 
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   if(DEFINED ENV{VITASDK})
@@ -25,6 +25,7 @@ add_executable(${PROJECT_NAME}
   src/perf.c
   src/oc.c
   src/profile.c
+  src/power.c
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -41,6 +42,8 @@ target_link_libraries(${PROJECT_NAME}
   SceCtrlForDriver_stub
   SceIofilemgrForDriver_stub
   SceSblAIMgrForDriver_stub
+  SceDisplayForDriver_stub
+  SceSblACMgrForDriver_stub
 )
 
 vita_create_self(${PROJECT_NAME}.skprx ${PROJECT_NAME}
